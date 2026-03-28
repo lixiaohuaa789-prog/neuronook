@@ -1,0 +1,31 @@
+{
+  "name": "study-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "知识点笔记本 · 间隔复习（考试脑科学节奏）· 番茄钟",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@cosmograph/react": "^2.2.1",
+    "date-fns": "^4.1.0",
+    "katex": "^0.16.40",
+    "lucide-react": "^0.577.0",
+    "next": "14.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-force-graph-2d": "^1.29.1",
+    "react-virtuoso": "^4.18.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "25.5.0",
+    "@types/react": "19.2.14",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2",
+    "typescript": "5.9.3"
+  }
+}
