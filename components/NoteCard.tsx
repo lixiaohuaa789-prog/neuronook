@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type { Note } from "@/lib/db";
 import { FormulaText } from "@/components/FormulaText";
 
@@ -25,6 +25,7 @@ export function NoteCard({
   expanded = false,
   onToggleExpand,
 }: NoteCardProps) {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const question = note.question || note.front;
   const coreAnswer = note.coreAnswer || note.content;
   const hasAdvancedFields =
@@ -186,15 +187,36 @@ export function NoteCard({
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {note.images.map((img, idx) => (
-                  <img
-                    key={idx}
-                    src={img}
-                    alt={`图片 ${idx + 1}`}
-                    className="w-full max-h-72 object-contain rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-1"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
+                  <div
+                    key={`${idx}-${img}`}
+                    className="block w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-2 hover:shadow-sm transition-shadow"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setPreviewImage(img)}
+                      className="block w-full"
+                      title="点击放大查看"
+                    >
+                      <img
+                        src={img}
+                        alt={`图片 ${idx + 1}`}
+                        className="mx-auto w-full max-h-56 object-contain rounded"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    </button>
+                    <a
+                      href={img}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block truncate text-xs underline"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      打开原图 / 链接
+                    </a>
+                  </div>
                 ))}
               </div>
             </div>
@@ -227,6 +249,33 @@ export function NoteCard({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="absolute inset-0 bg-black/70" aria-hidden />
+          <div
+            className="relative w-full max-w-5xl max-h-[90vh] rounded-xl border border-white/20 bg-black/30 p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute right-2 top-2 z-10 rounded-md bg-black/50 px-2 py-1 text-xs text-white hover:bg-black/70"
+              onClick={() => setPreviewImage(null)}
+              aria-label="关闭"
+            >
+              x
+            </button>
+            <img
+              src={previewImage}
+              alt="放大预览"
+              className="h-full w-full max-h-[85vh] object-contain rounded"
+            />
+          </div>
         </div>
       )}
     </div>

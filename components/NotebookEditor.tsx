@@ -11,6 +11,7 @@ export interface NotebookEditorProps {
   onCancel?: () => void;
   submitLabel?: string;
   showClearButton?: boolean;
+  initialMode?: EditorMode;
 }
 
 type EditorMode = "basic" | "preview" | "advanced";
@@ -223,8 +224,9 @@ export function NotebookEditor({
   onCancel,
   submitLabel = "保存知识点",
   showClearButton = false,
+  initialMode = "basic",
 }: NotebookEditorProps) {
-  const [mode, setMode] = useState<EditorMode>("basic");
+  const [mode, setMode] = useState<EditorMode>(initialMode);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved">("idle");
 
   const [question, setQuestion] = useState(initialData?.question || "");
@@ -459,7 +461,7 @@ export function NotebookEditor({
     setCustomSubject("");
     setShowCustomSubjectInput(false);
     setPreviewImageUrl(null);
-    setMode("basic");
+    setMode(initialMode);
     setSubmitState("idle");
   };
 
