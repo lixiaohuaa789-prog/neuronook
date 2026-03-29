@@ -3,6 +3,7 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { NewNoteInput, Note } from "@/lib/db";
 import { FormulaText } from "@/components/FormulaText";
+import { isCloudinaryConfigured, uploadImageToCloudinary } from "@/lib/image-host";
 
 export interface NotebookEditorProps {
   initialData?: NewNoteInput;
@@ -90,6 +91,15 @@ function compressImageDataUrl(dataUrl: string): Promise<string> {
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
+  });
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => resolve((event.target?.result as string) || "");
+    reader.onerror = () => reject(new Error("读取图片失败"));
+    reader.readAsDataURL(file);
   });
 }
 
@@ -256,8 +266,10 @@ export function NotebookEditor({
   showClearButton = false,
   initialMode = "basic",
 }: NotebookEditorProps) {
+  const cloudinaryConfigured = isCloudinaryConfigured();
   const [mode, setMode] = useState<EditorMode>(initialMode);
   const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved">("idle");
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const [question, setQuestion] = useState(initialData?.question || "");
   const [coreAnswer, setCoreAnswer] = useState(initialData?.coreAnswer || "");
@@ -285,6 +297,7 @@ export function NotebookEditor({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const submitResetTimerRef = useRef<number | null>(null);
+  const localFallbackNoticeShownRef = useRef(false);
 
   const SUBJECT_PRESETS = ["数学", "英语", "专业课", "通识", "未分类"] as const;
   const [customSubject, setCustomSubject] = useState(() => {
@@ -337,6 +350,38 @@ export function NotebookEditor({
     });
   };
 
+  const appendImage = (value: string) => {
+    startTransition(() => {
+      setImages((prev) => [...prev.filter((img) => img.trim()), value]);
+    });
+  };
+
+  const addImageFromFile = async (file: File) => {
+    setUploadingCount((prev) => prev + 1);
+    try {
+      const cloudUrl = await uploadImageToCloudinary(file);
+      if (cloudUrl) {
+        appendImage(cloudUrl);
+        return;
+      }
+
+      const raw = await fileToDataUrl(file);
+      const dataUrl = await compressImageDataUrl(raw);
+      appendImage(dataUrl);
+
+      if (!localFallbackNoticeShownRef.current) {
+        alert("当前未配置云端图片存储，已回退为本地压缩存储模式。建议配置 Cloudinary 后再使用大图。");
+        localFallbackNoticeShownRef.current = true;
+      }
+    } catch (error) {
+      console.error("[NotebookEditor] image upload failed", error);
+      const msg = error instanceof Error ? error.message : "图片上传失败，请重试";
+      alert(msg);
+    } finally {
+      setUploadingCount((prev) => Math.max(0, prev - 1));
+    }
+  };
+
   const addImageUrl = () => setImages((prev) => [...prev, ""]);
   const removeImageUrl = (index: number) => {
     setImages((prev) => {
@@ -351,16 +396,7 @@ export function NotebookEditor({
     if (files.length === 0) return;
 
     files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const raw = event.target?.result as string;
-        compressImageDataUrl(raw).then((dataUrl) => {
-          startTransition(() => {
-            setImages((prev) => [...prev.filter((img) => img.trim()), dataUrl]);
-          });
-        });
-      };
-      reader.readAsDataURL(file);
+      void addImageFromFile(file);
     });
 
     e.target.value = "";
@@ -375,17 +411,7 @@ export function NotebookEditor({
     imageItems.forEach((item) => {
       const file = item.getAsFile();
       if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const raw = event.target?.result as string;
-        compressImageDataUrl(raw).then((dataUrl) => {
-          startTransition(() => {
-            setImages((prev) => [...prev.filter((img) => img.trim()), dataUrl]);
-          });
-        });
-      };
-      reader.readAsDataURL(file);
+      void addImageFromFile(file);
     });
   };
 
@@ -429,6 +455,11 @@ export function NotebookEditor({
 
   const handleSubmit = () => {
     if (submitState !== "idle") return;
+
+    if (uploadingCount > 0) {
+      alert("图片仍在上传中，请等待上传完成后再保存");
+      return;
+    }
 
     if (!coreAnswer.trim()) {
       alert("请输入核心答案");
@@ -999,9 +1030,10 @@ export function NotebookEditor({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full px-4 py-2 bg-purple-300 text-purple-900 rounded-lg font-medium text-sm hover:bg-purple-400 transition-colors"
+              disabled={uploadingCount > 0}
+              className="w-full px-4 py-2 bg-purple-300 text-purple-900 rounded-lg font-medium text-sm hover:bg-purple-400 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
             >
-              📤 上传图片
+              {uploadingCount > 0 ? `📤 上传中（${uploadingCount}）` : "📤 上传图片"}
             </button>
             <input
               ref={fileInputRef}
@@ -1032,6 +1064,11 @@ export function NotebookEditor({
                 </div>
               ))}
             </div>
+            <p className="text-xs text-purple-700">
+              {cloudinaryConfigured
+                ? "已启用云端存储：上传/粘贴后会自动转为云端 URL，长期更稳定。"
+                : "当前未配置云端存储：会回退到本地压缩存储。建议配置 Cloudinary 以支持大图。"}
+            </p>
             <p className="text-xs text-purple-700">支持粘贴上传：在此区域按 Ctrl+V 可直接添加剪贴板图片</p>
 
             {imageEntries.length > 0 && (
@@ -1216,10 +1253,16 @@ export function NotebookEditor({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitState !== "idle"}
+                      disabled={submitState !== "idle" || uploadingCount > 0}
           className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 active:scale-95 transition-all shadow-md disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
         >
-          {submitState === "saving" ? "保存中..." : submitState === "saved" ? "✅ 已保存" : submitLabel}
+                      {uploadingCount > 0
+                        ? `图片上传中（${uploadingCount}）`
+                        : submitState === "saving"
+                          ? "保存中..."
+                          : submitState === "saved"
+                            ? "✅ 已保存"
+                            : submitLabel}
         </button>
       </div>
     </div>
