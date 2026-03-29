@@ -63,6 +63,36 @@ function hasMathExpression(text: string): boolean {
   return /\$[^$\n]+\$|\$\$[\s\S]+?\$\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]/.test(text);
 }
 
+// 压缩图片：最大边 1200px，JPEG 质量 0.72，减少 localStorage 占用
+function compressImageDataUrl(dataUrl: string): Promise<string> {
+  const MAX_SIDE = 1200;
+  const QUALITY = 0.72;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > MAX_SIDE || height > MAX_SIDE) {
+        if (width >= height) {
+          height = Math.round((height * MAX_SIDE) / width);
+          width = MAX_SIDE;
+        } else {
+          width = Math.round((width * MAX_SIDE) / height);
+          height = MAX_SIDE;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(dataUrl); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", QUALITY));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 type FlashcardImportResult = {
   question: string;
   coreAnswer: string;
@@ -323,9 +353,11 @@ export function NotebookEditor({
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        startTransition(() => {
-          setImages((prev) => [...prev.filter((img) => img.trim()), dataUrl]);
+        const raw = event.target?.result as string;
+        compressImageDataUrl(raw).then((dataUrl) => {
+          startTransition(() => {
+            setImages((prev) => [...prev.filter((img) => img.trim()), dataUrl]);
+          });
         });
       };
       reader.readAsDataURL(file);
@@ -346,9 +378,11 @@ export function NotebookEditor({
 
       const reader = new FileReader();
       reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        startTransition(() => {
-          setImages((prev) => [...prev.filter((img) => img.trim()), dataUrl]);
+        const raw = event.target?.result as string;
+        compressImageDataUrl(raw).then((dataUrl) => {
+          startTransition(() => {
+            setImages((prev) => [...prev.filter((img) => img.trim()), dataUrl]);
+          });
         });
       };
       reader.readAsDataURL(file);
@@ -443,6 +477,8 @@ export function NotebookEditor({
       }, 1200);
     } catch (error) {
       console.error("[NotebookEditor] submit failed", error);
+      const msg = error instanceof Error ? error.message : "保存失败，请重试";
+      alert(msg);
       setSubmitState("idle");
     }
   };

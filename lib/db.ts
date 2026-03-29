@@ -250,7 +250,17 @@ export function getDB(): StudyDB | null {
 }
 
 export function saveDB(db: StudyDB) {
-  localStorage.setItem(KEY, JSON.stringify(db));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(db));
+  } catch (e) {
+    const isQuota =
+      e instanceof DOMException &&
+      (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED");
+    if (isQuota) {
+      throw new Error("本地存储空间已满，图片太大或数据过多。请尝试使用图片 URL 替代直接上传，或删除部分旧数据。");
+    }
+    throw e;
+  }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("study-app-changed"));
   }
