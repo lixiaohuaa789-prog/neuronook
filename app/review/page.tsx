@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { FormulaText } from "../../components/FormulaText";
+import { NotebookEditor } from "../../components/NotebookEditor";
 import KeywordBubbles from "../../components/KeywordBubbles";
 import { DebugPanel } from "../../components/DebugPanel";
 import {
@@ -411,12 +412,6 @@ function ReviewPageContent() {
   const [keywordsByNoteId, setKeywordsByNoteId] = useState<Record<number, string[]>>({});
   const [keywordDraft, setKeywordDraft] = useState("");
   const [isEditing, setIsEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState({
-    coreAnswer: "",
-    keyPointsText: "",
-    examples: "",
-    commonMistakes: "",
-  });
   const recallContentRef = useRef<HTMLDivElement | null>(null);
 
   const buildSubjectSet = (reviewItems: Array<ReviewQueueItem | FrameworkReviewItem>) => {
@@ -683,12 +678,6 @@ function ReviewPageContent() {
 
     setKeywordDraft("");
     setIsEditing(false);
-    setEditDraft({
-      coreAnswer: recallItem.note.coreAnswer ?? "",
-      keyPointsText: (recallItem.note.keyPoints ?? []).join("\n"),
-      examples: recallItem.note.examples ?? "",
-      commonMistakes: recallItem.note.commonMistakes ?? "",
-    });
 
     setKeywordsByNoteId((prev) => {
       if (prev[recallItem.note.id]) return prev;
@@ -752,25 +741,12 @@ function ReviewPageContent() {
     setKeywordsByNoteId((prev) => ({ ...prev, [updated.id]: updated.keywords ?? [] }));
   };
 
-  const saveInlineEdit = () => {
+  const saveInlineEdit = (data: Parameters<typeof updateNote>[1]) => {
     if (!recallItem) return;
-    const keyPoints = editDraft.keyPointsText
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
 
     const updated = updateNote(recallItem.note.id, {
-      front: recallItem.note.front,
-      question: recallItem.note.question,
-      subject: recallItem.note.subject,
-      difficulty: recallItem.note.difficulty,
-      content: editDraft.coreAnswer,
-      coreAnswer: editDraft.coreAnswer,
-      keyPoints,
+      ...data,
       keywords: keywordsByNoteId[recallItem.note.id] ?? recallItem.note.keywords ?? [],
-      examples: editDraft.examples,
-      commonMistakes: editDraft.commonMistakes,
-      images: recallItem.note.images,
     });
 
     if (!updated) {
@@ -1550,30 +1526,50 @@ function ReviewPageContent() {
             </div>
 
             <div ref={recallContentRef} className="max-h-[72vh] overflow-y-auto px-6 py-5">
-              {!hasDeepStudyInfo(recallItem) ? (
-                <p className="text-sm text-slate-500">
-                  这张卡片当时还没有记录“深化学习”信息。
-                </p>
+              {isEditing ? (
+                <div className="rounded-2xl border border-[#DADCCF] bg-white/80 p-4 sm:p-5">
+                  <NotebookEditor
+                    initialData={{
+                      front: recallItem.note.front,
+                      content: recallItem.note.coreAnswer ?? recallItem.note.content,
+                      subject: recallItem.note.subject,
+                      difficulty: recallItem.note.difficulty,
+                      question: recallItem.note.question ?? recallItem.note.front,
+                      coreAnswer: recallItem.note.coreAnswer ?? recallItem.note.content,
+                      keyPoints: recallItem.note.keyPoints,
+                      commonMistakes: recallItem.note.commonMistakes,
+                      examples: recallItem.note.examples,
+                      images: recallItem.note.images,
+                    }}
+                    initialMode="advanced"
+                    onSubmit={saveInlineEdit}
+                    onCancel={() => setIsEditing(false)}
+                    submitLabel="保存深化记忆"
+                  />
+                </div>
+              ) : !hasDeepStudyInfo(recallItem) ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-500">
+                    这张卡片当时还没有记录“深化学习”信息。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="rounded-lg border border-[#D4D6C8] bg-[#F2F2E8] px-3 py-1.5 text-xs font-semibold text-slate-600 font-sans"
+                  >
+                    补充深化记忆
+                  </button>
+                </div>
               ) : (
                 <div className="flex flex-col gap-5">
                   <div className="flex justify-end">
-                    {isEditing ? (
-                      <button
-                        type="button"
-                        onClick={saveInlineEdit}
-                        className="rounded-lg border border-[#B5C59A] bg-[#E9F0DF] px-3 py-1.5 text-xs font-semibold text-[#2A3B2C] font-sans"
-                      >
-                        保存
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(true)}
-                        className="rounded-lg border border-[#D4D6C8] bg-[#F2F2E8] px-3 py-1.5 text-xs font-semibold text-slate-600 font-sans"
-                      >
-                        ✏️ 编辑
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="rounded-lg border border-[#D4D6C8] bg-[#F2F2E8] px-3 py-1.5 text-xs font-semibold text-slate-600 font-sans"
+                    >
+                      ✏️ 编辑
+                    </button>
                   </div>
 
                   <section className="grid grid-cols-[minmax(130px,34%)_1fr] items-start gap-4 md:gap-6">
@@ -1588,7 +1584,7 @@ function ReviewPageContent() {
                             <span aria-hidden>🔖</span>
                             <FormulaText
                               text={recallAnswerLayout.focus ?? ""}
-                              className={recallAnswerLayout.focusIsMath ? "memory-focus-math font-serif leading-relaxed tracking-wide text-slate-700" : "font-serif leading-relaxed tracking-wide text-slate-700"}
+                              className={recallAnswerLayout.focusIsMath ? "memory-focus-math leading-relaxed tracking-wide text-slate-700" : "leading-relaxed tracking-wide text-slate-700"}
                             />
                           </span>
                         )}
@@ -1597,82 +1593,47 @@ function ReviewPageContent() {
                           onAdd={(kw) => addKeywordForRecall(kw)}
                           onRemove={removeKeywordForRecall}
                           placeholder="+ 提取关键词..."
+                          fontFamily={WENKAI_CONTENT_FONT}
                         />
                       </div>
                     </div>
 
                     <div className="min-w-0">
                       <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-2 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#B96D5C]/35 before:-z-10">核心答案</p>
-                      {isEditing ? (
-                        <textarea
-                          value={editDraft.coreAnswer}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, coreAnswer: e.target.value }))}
-                          className="w-full min-h-[140px] rounded-xl border border-[#DADCCF] bg-[#F6F7EF] p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#A6B29A]"
-                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
-                        />
-                      ) : (
-                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700 recall-derivation-zone" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                          {recallAnswerLayout.hasFocus
-                            ? (recallAnswerLayout.rest
-                                ? renderSegmentsWithCallout(recallAnswerLayout.rest, "recall-answer")
-                                : <p className="text-slate-500">已提取核心锚点，无额外推演内容。</p>)
-                            : renderSegmentsWithCallout(recallItem.note.coreAnswer ?? "", "recall-answer")}
-                        </div>
-                      )}
+                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-slate-700 recall-derivation-zone" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                        {recallAnswerLayout.hasFocus
+                          ? (recallAnswerLayout.rest
+                              ? renderSegmentsWithCallout(recallAnswerLayout.rest, "recall-answer")
+                              : <p className="text-slate-500">已提取核心锚点，无额外推演内容。</p>)
+                          : renderSegmentsWithCallout(recallItem.note.coreAnswer ?? "", "recall-answer")}
+                      </div>
                     </div>
                   </section>
 
-                  {((recallItem.note.keyPoints && recallItem.note.keyPoints.length > 0) || isEditing) && (
+                  {recallItem.note.keyPoints && recallItem.note.keyPoints.length > 0 && (
                     <section>
                       <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">关键点</p>
-                      {isEditing ? (
-                        <textarea
-                          value={editDraft.keyPointsText}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, keyPointsText: e.target.value }))}
-                          className="w-full min-h-[110px] rounded-xl border border-[#DADCCF] bg-[#F6F7EF] p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#A6B29A]"
-                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
-                        />
-                      ) : (
-                        <ul className="mt-1 list-disc pl-5 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 marker:text-[#5F7865]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                          {(recallItem.note.keyPoints ?? []).map((point, idx) => (
-                            <li key={`${idx}-${point}`}><FormulaText text={point} className="note-card-keypoint-formula" /></li>
-                          ))}
-                        </ul>
-                      )}
+                      <ul className="mt-1 list-disc pl-5 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-slate-700 marker:text-[#5F7865]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                        {(recallItem.note.keyPoints ?? []).map((point, idx) => (
+                          <li key={`${idx}-${point}`}><FormulaText text={point} className="note-card-keypoint-formula" /></li>
+                        ))}
+                      </ul>
                     </section>
                   )}
 
-                  {(recallItem.note.examples || isEditing) && (
+                  {recallItem.note.examples && (
                     <section>
                       <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">示例 / 应用场景</p>
-                      {isEditing ? (
-                        <textarea
-                          value={editDraft.examples}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, examples: e.target.value }))}
-                          className="w-full min-h-[100px] rounded-xl border border-[#A6B29A]/50 bg-[#A3B18A]/10 p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#8EA078]"
-                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
-                        />
-                      ) : (
-                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}><FormulaText text={recallItem.note.examples ?? ""} /></div>
-                      )}
+                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}><FormulaText text={recallItem.note.examples ?? ""} /></div>
                     </section>
                   )}
 
-                  {(recallItem.note.commonMistakes || isEditing) && (
+                  {recallItem.note.commonMistakes && (
                     <section>
                       <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">易错点 / 常见误区</p>
-                      {isEditing ? (
-                        <textarea
-                          value={editDraft.commonMistakes}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, commonMistakes: e.target.value }))}
-                          className="w-full min-h-[100px] rounded-xl border border-[#E4C7C2] bg-[#FFF1F0] p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#D9A8A1]"
-                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
-                        />
-                      ) : (
-                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                          {renderSegmentsWithCallout(recallItem.note.commonMistakes ?? "", "recall-mistakes")}
-                        </div>
-                      )}
+                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                        {renderSegmentsWithCallout(recallItem.note.commonMistakes ?? "", "recall-mistakes")}
+                      </div>
                     </section>
                   )}
 

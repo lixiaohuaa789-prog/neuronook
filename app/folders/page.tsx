@@ -1089,7 +1089,7 @@ export default function FoldersPage() {
                                             核心答案
                                           </span>
                                         </p>
-                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-[var(--text)]">
+                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]">
                                           <span style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                                             <FormulaText text={displayAnswer} inline />
                                           </span>
@@ -1109,7 +1109,7 @@ export default function FoldersPage() {
                                             <li key={`${note.id}-kp-${idx}`} className="flex min-w-0 gap-2 text-sm text-[var(--text)]">
                                               <span className="min-w-4 font-semibold text-[var(--accent)]">{idx + 1}.</span>
                                               <span
-                                                className="min-w-0 flex-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
+                                                className="min-w-0 flex-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify"
                                                 style={{ fontFamily: WENKAI_CONTENT_FONT }}
                                               >
                                                 <span className="block max-w-full overflow-x-auto">
@@ -1129,7 +1129,7 @@ export default function FoldersPage() {
                                             易错点
                                           </span>
                                         </p>
-                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                                           <FormulaText text={note.commonMistakes} inline className="note-card-mistakes-formula" />
                                         </div>
                                       </section>
@@ -1142,7 +1142,7 @@ export default function FoldersPage() {
                                             示例应用
                                           </span>
                                         </p>
-                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                                           <FormulaText text={note.examples} />
                                         </div>
                                       </section>

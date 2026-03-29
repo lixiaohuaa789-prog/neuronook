@@ -17,6 +17,8 @@ import {
 import { getSubjectTheme } from "../../../lib/subjectTheme";
 import { srsStepLabel, srsStepHint } from "../../../lib/srs";
 
+const WENKAI_CONTENT_FONT = '"LXGW WenKai Screen", "LXGW WenKai", "Kaiti SC", "STKaiti", "Noto Serif SC", serif';
+
 type FocusSplit = {
   focus: string | null;
   rest: string;
@@ -863,11 +865,11 @@ function SummaryPageContent() {
                       <p className="text-xs font-semibold tracking-widest text-[#7A8B7C] uppercase mb-2">记忆泡泡</p>
                       <div className="flex flex-col gap-2">
                         {recallAnswerLayout.hasFocus && (
-                          <span className="inline-flex items-center gap-2 self-start rounded-full border border-[#9BAA95]/55 bg-[#E7ECDF]/85 px-3 py-1.5 text-sm font-semibold font-serif leading-relaxed tracking-wide text-slate-700 shadow-[0_8px_24px_rgb(0,0,0,0.06)] backdrop-blur-sm">
+                          <span className="inline-flex items-center gap-2 self-start rounded-full border border-[#9BAA95]/55 bg-[#E7ECDF]/85 px-3 py-1.5 text-sm font-semibold font-serif leading-relaxed tracking-wide text-slate-700 shadow-[0_8px_24px_rgb(0,0,0,0.06)] backdrop-blur-sm" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                             <span aria-hidden>🔖</span>
                             <FormulaText
                               text={recallAnswerLayout.focus ?? ""}
-                              className={recallAnswerLayout.focusIsMath ? "memory-focus-math font-serif leading-relaxed tracking-wide text-slate-700" : "font-serif leading-relaxed tracking-wide text-slate-700"}
+                              className={recallAnswerLayout.focusIsMath ? "memory-focus-math leading-relaxed tracking-wide text-slate-700" : "leading-relaxed tracking-wide text-slate-700"}
                             />
                           </span>
                         )}
@@ -876,6 +878,7 @@ function SummaryPageContent() {
                           onAdd={(kw) => addKeywordForRecall(kw)}
                           onRemove={removeKeywordForRecall}
                           placeholder="+ 提取关键词..."
+                          fontFamily={WENKAI_CONTENT_FONT}
                         />
                       </div>
                     </div>
@@ -887,9 +890,10 @@ function SummaryPageContent() {
                           value={editDraft.coreAnswer}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, coreAnswer: e.target.value }))}
                           className="w-full min-h-[140px] rounded-xl border border-[#DADCCF] bg-[#F6F7EF] p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#A6B29A]"
+                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
                         />
                       ) : (
-                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700">
+                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                           {recallAnswerLayout.hasFocus
                             ? (recallAnswerLayout.rest
                                 ? renderSegmentsWithCallout(recallAnswerLayout.rest, "summary-recall-answer")
@@ -908,9 +912,10 @@ function SummaryPageContent() {
                           value={editDraft.keyPointsText}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, keyPointsText: e.target.value }))}
                           className="w-full min-h-[110px] rounded-xl border border-[#DADCCF] bg-[#F6F7EF] p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#A6B29A]"
+                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
                         />
                       ) : (
-                        <ul className="mt-1 list-disc pl-5 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 marker:text-[#5F7865]">
+                        <ul className="mt-1 list-disc pl-5 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 marker:text-[#5F7865]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                           {(recallLog.note.keyPoints ?? []).map((point, idx) => (
                             <li key={`${idx}-${point}`}><FormulaText text={point} className="note-card-keypoint-formula" /></li>
                           ))}
@@ -927,9 +932,10 @@ function SummaryPageContent() {
                           value={editDraft.examples}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, examples: e.target.value }))}
                           className="w-full min-h-[100px] rounded-xl border border-[#A6B29A]/50 bg-[#A3B18A]/10 p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#8EA078]"
+                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
                         />
                       ) : (
-                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700"><FormulaText text={recallLog.note.examples ?? ""} /></div>
+                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}><FormulaText text={recallLog.note.examples ?? ""} /></div>
                       )}
                     </section>
                   )}
@@ -942,9 +948,10 @@ function SummaryPageContent() {
                           value={editDraft.commonMistakes}
                           onChange={(e) => setEditDraft((prev) => ({ ...prev, commonMistakes: e.target.value }))}
                           className="w-full min-h-[100px] rounded-xl border border-[#E4C7C2] bg-[#FFF1F0] p-4 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700 outline-none focus:border-[#D9A8A1]"
+                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
                         />
                       ) : (
-                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700">
+                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                           {renderSegmentsWithCallout(recallLog.note.commonMistakes ?? "", "summary-recall-mistakes")}
                         </div>
                       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, KeyboardEvent, type CSSProperties } from "react";
 import { FormulaText } from "./FormulaText";
 
 interface KeywordBubblesProps {
@@ -14,6 +14,8 @@ interface KeywordBubblesProps {
   placeholder?: string;
   /** 是否禁用输入（只读模式） */
   readOnly?: boolean;
+  /** 可选内容字体 */
+  fontFamily?: CSSProperties["fontFamily"];
 }
 
 /**
@@ -27,9 +29,11 @@ export default function KeywordBubbles({
   onRemove,
   placeholder = "+ 提取关键词...",
   readOnly = false,
+  fontFamily,
 }: KeywordBubblesProps) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const contentStyle = fontFamily ? { fontFamily } : undefined;
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
@@ -77,8 +81,9 @@ export default function KeywordBubbles({
               shadow-[0_4px_12px_rgb(0,0,0,0.05)]
               text-sm font-medium text-[#4A5568] font-sans
               select-none"
+            style={contentStyle}
           >
-            <FormulaText text={kw} />
+            <FormulaText text={kw} inline className="whitespace-pre-wrap break-words" />
             {!readOnly && (
               <button
                 type="button"
@@ -109,6 +114,7 @@ export default function KeywordBubbles({
             className="min-w-[9rem] flex-1 bg-transparent text-sm text-[#4A5568] font-sans
               placeholder:text-[#4A5568]/35 outline-none border-none
               py-1.5 caret-[#9BAA95]"
+            style={contentStyle}
           />
         )}
       </div>

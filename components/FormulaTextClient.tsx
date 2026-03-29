@@ -42,8 +42,9 @@ function sanitizeMathInput(input: string): string {
   s = s.replace(/\\\\\\\\/g, "\\\\");
 
   // 3. Lone surrogates
+  // Keep valid surrogate pairs so emoji and other astral symbols survive.
   // eslint-disable-next-line no-control-regex
-  s = s.replace(/[\uD800-\uDFFF]/g, "");
+  s = s.replace(/(?:[\uD800-\uDBFF](?![\uDC00-\uDFFF]))|(?:(?<![\uD800-\uDBFF])[\uDC00-\uDFFF])/g, "");
 
   // 4. Full-width / look-alike character substitution
   s = s
