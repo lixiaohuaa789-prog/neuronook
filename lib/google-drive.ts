@@ -16,7 +16,7 @@ type GoogleAccounts = {
     initTokenClient: (config: {
       client_id: string;
       scope: string;
-      callback: (response: { access_token?: string; error?: string; expires_in?: number }) => void;
+      callback: (response: GoogleTokenResponse) => void;
     }) => {
       requestAccessToken: (overrides?: { prompt?: string }) => void;
     };
@@ -40,6 +40,12 @@ export type GoogleUserProfile = {
   email: string;
   name: string;
   picture?: string;
+};
+
+type GoogleTokenResponse = {
+  access_token?: string;
+  error?: string;
+  expires_in?: number;
 };
 
 function ensureGoogleIdentityLoaded(): Promise<void> {
@@ -75,6 +81,14 @@ export async function signInWithGoogle(clientId: string): Promise<GoogleAuthSess
     throw new Error("Google OAuth 初始化失败");
   }
 
+  return requestGoogleToken(oauth2, clientId, { prompt: "consent" });
+}
+
+function requestGoogleToken(
+  oauth2: GoogleAccounts["oauth2"],
+  clientId: string,
+  overrides?: { prompt?: string }
+): Promise<GoogleAuthSession> {
   return new Promise((resolve, reject) => {
     const tokenClient = oauth2.initTokenClient({
       client_id: clientId,
@@ -91,7 +105,7 @@ export async function signInWithGoogle(clientId: string): Promise<GoogleAuthSess
       },
     });
 
-    tokenClient.requestAccessToken({ prompt: "consent" });
+    tokenClient.requestAccessToken(overrides);
   });
 }
 

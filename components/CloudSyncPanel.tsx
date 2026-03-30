@@ -26,6 +26,12 @@ type SyncStatus = {
 } | null;
 
 const RECOMMENDED_BACKUP_SIZE_BYTES = 8 * 1024 * 1024;
+const GOOGLE_AUTH_STORAGE_KEY = "study-app.google-auth";
+
+type PersistedGoogleAuth = {
+  session: GoogleAuthSession;
+  profile: GoogleUserProfile;
+};
 
 export interface CloudSyncPanelProps {
   compact?: boolean;
@@ -68,6 +74,14 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
     window.setTimeout(() => setStatus(null), 2800);
   };
 
+  const clearConnection = () => {
+    setSession(null);
+    setProfile(null);
+    window.localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+  };
+
+  const isSessionExpired = (candidate: GoogleAuthSession) => candidate.expiresAtMs <= Date.now();
+
   useEffect(() => {
     if (!compact) {
       setOpen(true);
@@ -77,6 +91,46 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       setOpen(true);
     }
   }, [compact, loading, status]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(GOOGLE_AUTH_STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<PersistedGoogleAuth>;
+      const nextSession = parsed.session;
+      const nextProfile = parsed.profile;
+      if (!nextSession || !nextProfile || typeof nextSession.accessToken !== "string" || typeof nextSession.expiresAtMs !== "number") {
+        window.localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+        return;
+      }
+
+      if (isSessionExpired(nextSession)) {
+        window.localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+        return;
+      }
+
+      setSession(nextSession);
+      setProfile(nextProfile as GoogleUserProfile);
+    } catch {
+      window.localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!session || !profile) {
+      window.localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+      return;
+    }
+
+    if (isSessionExpired(session)) {
+      clearConnection();
+      return;
+    }
+
+    const payload: PersistedGoogleAuth = { session, profile };
+    window.localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(payload));
+  }, [profile, session]);
 
   useEffect(() => {
     const calcEstimate = () => {
@@ -200,6 +254,12 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       return;
     }
 
+    if (isSessionExpired(session)) {
+      clearConnection();
+      showStatus({ type: "error", message: "Google 登录已过期，请重新连接" });
+      return;
+    }
+
     setLoading("backup");
     try {
       const payload = buildBackupPayload();
@@ -234,6 +294,12 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
   const handleRestore = async () => {
     if (!session) {
       showStatus({ type: "error", message: "请先连接 Google 账号" });
+      return;
+    }
+
+    if (isSessionExpired(session)) {
+      clearConnection();
+      showStatus({ type: "error", message: "Google 登录已过期，请重新连接" });
       return;
     }
 
