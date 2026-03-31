@@ -827,7 +827,7 @@ export function NotebookEditor({
                   }}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                     subject === s
-                      ? "bg-emerald-800 text-emerald-50 shadow-md"
+                      ? "bg-[var(--accent)] text-white shadow-md"
                       : "bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] border border-transparent"
                   }`}
                 >
@@ -862,7 +862,7 @@ export function NotebookEditor({
                         }}
                         className={`px-4 py-2 pr-7 rounded-lg font-medium text-sm transition-all ${
                           subject === s
-                            ? "bg-emerald-800 text-emerald-50 shadow-md"
+                            ? "bg-[var(--accent)] text-white shadow-md"
                             : "bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] border border-transparent"
                         }`}
                       >
@@ -924,7 +924,7 @@ export function NotebookEditor({
                   onClick={() => setDifficulty(opt.value)}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all inline-flex items-center gap-2 ${
                     difficulty === opt.value
-                      ? "bg-emerald-800 text-emerald-50 shadow-md"
+                      ? "bg-[var(--accent)] text-white shadow-md"
                       : "bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] border border-transparent"
                   }`}
                 >
@@ -1294,7 +1294,7 @@ export function NotebookEditor({
           type="button"
           onClick={handleSubmit}
                       disabled={submitState !== "idle" || uploadingCount > 0}
-          className="px-6 py-2 bg-emerald-800 text-emerald-50 rounded-lg font-medium hover:bg-emerald-700 active:scale-95 transition-all shadow-md disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+          className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg font-medium hover:brightness-105 active:scale-95 transition-all shadow-md disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
         >
                       {uploadingCount > 0
                         ? `图片上传中（${uploadingCount}）`

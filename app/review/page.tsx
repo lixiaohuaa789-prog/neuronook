@@ -1163,7 +1163,7 @@ function ReviewPageContent() {
               <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
                 <Link
                   href="/notes"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-emerald-800 text-emerald-50 font-semibold rounded-xl hover:bg-emerald-700 hover:shadow-md hover:-translate-y-1 active:translate-y-0 transition-all shadow-md min-h-12"
+                  className="inline-flex items-center justify-center px-8 py-4 bg-[var(--accent)] text-white font-semibold rounded-xl hover:brightness-105 hover:shadow-md hover:-translate-y-1 active:translate-y-0 transition-all shadow-md min-h-12"
                 >
                   ✨ 添加新知识点
                 </Link>
@@ -1485,39 +1485,29 @@ function ReviewPageContent() {
                           </div>
                         )}
                         <div className="card-actions card-actions-anki mt-4 font-sans">
-                          {!isFlipped ? (
+                          <>
                             <button
                               type="button"
-                              className="btn w-full border border-emerald-700 bg-emerald-800 text-emerald-50 hover:bg-emerald-700 font-sans"
-                              onClick={() => toggleFlip(item.note_id)}
+                              className="btn btn-forget font-sans"
+                              onClick={() => onReviewFeedback(item.note_id, "forgot")}
                             >
-                              Show Answer
+                              忘了
                             </button>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-forget font-sans"
-                                onClick={() => onReviewFeedback(item.note_id, "forgot")}
-                              >
-                                忘了
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-ghost font-sans"
-                                onClick={() => onReviewFeedback(item.note_id, "hard")}
-                              >
-                                模糊
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-remember font-sans"
-                                onClick={() => onReviewFeedback(item.note_id, "easy")}
-                              >
-                                轻松
-                              </button>
-                            </>
-                          )}
+                            <button
+                              type="button"
+                              className="btn btn-ghost font-sans"
+                              onClick={() => onReviewFeedback(item.note_id, "hard")}
+                            >
+                              模糊
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-remember font-sans"
+                              onClick={() => onReviewFeedback(item.note_id, "easy")}
+                            >
+                              轻松
+                            </button>
+                          </>
                         </div>
                       </article>
                       </div>
