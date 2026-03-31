@@ -4,10 +4,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Brain, CalendarDays, LayoutDashboard, Trees } from "lucide-react";
+import { Brain, CalendarDays, LayoutDashboard, Moon, Sun, Trees } from "lucide-react";
 import { getTrainingTimerState, STUDY_TIMER_EVENT } from "../lib/trainingTimer";
 import { BioClockWidget } from "./BioClockWidget";
 import { CloudSyncPanel } from "./CloudSyncPanel";
+import { useTheme } from "./ThemeProvider";
 import avatarImage from "../icon/yjtp.png";
 
 const navItems = [
@@ -56,6 +57,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const [timerDisplay, setTimerDisplay] = useState<{ time: number } | null>(null);
+  const { mode, resolvedTheme, setMode, toggleTheme } = useTheme();
 
   useEffect(() => {
     const sync = () => {
@@ -76,13 +78,13 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className="sidebar border-r border-gray-200/60 bg-gray-50/40 px-3 py-4" aria-label="侧边栏">
+    <aside className="sidebar border-r border-[var(--border)] bg-[var(--sidebar-bg)]/80 px-3 py-4" aria-label="侧边栏">
       <div className="flex h-full flex-col bg-transparent px-1">
         <Link
           href="/"
-          className="group flex items-center gap-3 rounded-xl px-2 py-2 no-underline transition-all duration-200 hover:bg-gray-100/50"
+          className="group flex items-center gap-3 rounded-xl px-2 py-2 no-underline transition-all duration-200 hover:bg-[var(--surface-hover)]/65"
         >
-          <span className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/90 shadow-sm transition-all duration-200 ring-1 ring-gray-200/80 group-hover:ring-gray-300">
+          <span className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-[var(--surface)]/95 shadow-sm transition-all duration-200 ring-1 ring-[var(--border)] group-hover:ring-[var(--border-strong)]">
             <Image
               src={avatarImage}
               alt="头像"
@@ -90,9 +92,9 @@ export function Sidebar() {
               priority
             />
           </span>
-          <span className="flex min-w-0 flex-col leading-tight text-gray-800">
+          <span className="flex min-w-0 flex-col leading-tight text-[var(--text)]">
             <span className="break-words text-[0.95rem] font-bold tracking-tight">NeuroNook</span>
-            <small className="whitespace-normal break-words text-[0.68rem] font-medium leading-snug text-gray-500">
+            <small className="whitespace-normal break-words text-[0.68rem] font-medium leading-snug text-[var(--muted)]">
               It's Okay to not to be Okay🤍
             </small>
           </span>
@@ -110,10 +112,10 @@ export function Sidebar() {
                 data-active={active ? "true" : "false"}
                 className={[
                   "group flex items-center gap-3 rounded-xl px-3 py-2.5 no-underline transition-all duration-200",
-                  "hover:bg-gray-100/50 hover:text-gray-900",
+                  "hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
                   active
-                    ? "border border-gray-100/80 bg-white text-emerald-600 font-semibold shadow-sm"
-                    : "border border-transparent text-gray-500 font-medium",
+                    ? "border border-[var(--border)] bg-[var(--surface)] text-emerald-500 font-semibold shadow-sm"
+                    : "border border-transparent text-[var(--muted)] font-medium",
                 ].join(" ")}
               >
                 <span
@@ -121,7 +123,7 @@ export function Sidebar() {
                     "inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
                     active
                       ? "text-emerald-500"
-                      : "text-gray-400 group-hover:text-gray-700",
+                      : "text-[var(--muted)] group-hover:text-[var(--text)]",
                   ].join(" ")}
                 >
                   <Icon size={18} strokeWidth={2.2} />
@@ -131,7 +133,7 @@ export function Sidebar() {
                   <span
                     className={[
                       "mt-0.5 block whitespace-normal break-words text-[0.7rem] font-medium leading-tight",
-                      active ? "text-emerald-500/90" : "text-gray-400 group-hover:text-gray-500",
+                      active ? "text-emerald-500/90" : "text-[var(--muted)] group-hover:text-[var(--muted)]/90",
                     ].join(" ")}
                   >
                     {subtitle}
@@ -158,8 +160,28 @@ export function Sidebar() {
           <BioClockWidget mode="sidebar" />
         </section>
 
-        <footer className="mt-4 border-t border-gray-200/70 pt-3">
-          <p className="whitespace-normal break-words text-[0.68rem] font-medium tracking-wide text-gray-400">
+        <footer className="mt-4 border-t border-[var(--border)] pt-3">
+          <div className="mb-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:text-[var(--text)]"
+              aria-label="切换深色主题"
+              title={`当前主题：${resolvedTheme === "dark" ? "深色" : "浅色"}`}
+            >
+              {resolvedTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <select
+              value={mode}
+              onChange={(event) => setMode(event.target.value as "light" | "dark")}
+              className="h-8 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[0.7rem] text-[var(--text)]"
+              aria-label="主题模式"
+            >
+              <option value="light">主题: 浅色</option>
+              <option value="dark">主题: 深色</option>
+            </select>
+          </div>
+          <p className="whitespace-normal break-words text-[0.68rem] font-medium tracking-wide text-[var(--muted)]">
             本地优先 · 可选端到端云备份
           </p>
         </footer>

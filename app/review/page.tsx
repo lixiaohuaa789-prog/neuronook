@@ -161,8 +161,8 @@ function splitCalloutSegments(text: string): CalloutSegment[] {
 function renderSegmentsWithCallout(text: string, keyPrefix: string, className?: string): ReactNode {
   const segments = splitCalloutSegments(text);
   const baseTextClass = className
-    ? `whitespace-pre-wrap text-[0.97rem] leading-7 text-slate-700 ${className}`
-    : "whitespace-pre-wrap text-[0.97rem] leading-7 text-slate-700";
+    ? `whitespace-pre-wrap text-[0.97rem] leading-7 text-[var(--text)] ${className}`
+    : "whitespace-pre-wrap text-[0.97rem] leading-7 text-[var(--text)]";
 
   if (segments.length === 0) {
     return (
@@ -1072,9 +1072,13 @@ function ReviewPageContent() {
             {/* 已记住 */}
             <Link
               href="/review/summary?filter=remembered"
-              className="flex flex-col items-center p-3 rounded-lg bg-green-50 hover:bg-green-100 transition-colors"
+              className="flex flex-col items-center p-3 rounded-lg transition-colors"
+              style={{
+                background: "var(--accent-soft)",
+                border: "1px solid var(--border)",
+              }}
             >
-              <div className="text-2xl font-bold text-green-700 mb-1">{todayStats.remembered}</div>
+              <div className="text-2xl font-bold mb-1" style={{ color: "var(--accent)" }}>{todayStats.remembered}</div>
               <div className="text-xs text-center" style={{ color: "var(--text)" }}>
                 已记住
               </div>
@@ -1084,8 +1088,14 @@ function ReviewPageContent() {
             </Link>
 
             {/* 已遗忘 */}
-            <div className="flex flex-col items-center p-3 rounded-lg bg-orange-50">
-              <div className="text-2xl font-bold text-orange-700 mb-1">{todayStats.forgotten}</div>
+            <div
+              className="flex flex-col items-center p-3 rounded-lg"
+              style={{
+                background: "var(--danger-soft)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div className="text-2xl font-bold mb-1" style={{ color: "var(--danger)" }}>{todayStats.forgotten}</div>
               <div className="text-xs text-center" style={{ color: "var(--text)" }}>
                 已遗忘
               </div>
@@ -1126,7 +1136,13 @@ function ReviewPageContent() {
         <div className="mt-8 space-y-6">
           {/* 主空状态卡片 */}
           <div className="px-4 sm:px-6 lg:px-8">
-            <div className="bg-gradient-to-br from-spring-bg to-green-50 border border-spring-green border-opacity-30 rounded-2xl p-8 sm:p-10">
+            <div
+              className="rounded-2xl p-8 sm:p-10"
+              style={{
+                background: "linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%)",
+                border: "1px solid var(--border-strong)",
+              }}
+            >
               {/* 标题 */}
               <div className="text-center mb-6">
                 <div className="text-5xl sm:text-6xl mb-4">🧠</div>
@@ -1147,14 +1163,15 @@ function ReviewPageContent() {
               <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
                 <Link
                   href="/notes"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-spring-green to-spring-green-light text-white font-semibold rounded-xl hover:shadow-md hover:-translate-y-1 active:translate-y-0 transition-all shadow-md min-h-12"
+                  className="inline-flex items-center justify-center px-8 py-4 bg-emerald-800 text-emerald-50 font-semibold rounded-xl hover:bg-emerald-700 hover:shadow-md hover:-translate-y-1 active:translate-y-0 transition-all shadow-md min-h-12"
                 >
                   ✨ 添加新知识点
                 </Link>
                 <Link
                   href="/calendar"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-white font-semibold rounded-xl border-2 transition-all shadow-sm min-h-12"
+                  className="inline-flex items-center justify-center px-8 py-4 font-semibold rounded-xl border transition-all shadow-sm min-h-12"
                   style={{
+                    background: "var(--surface)",
                     color: "var(--text)",
                     borderColor: "var(--border-strong)",
                   }}
@@ -1175,14 +1192,20 @@ function ReviewPageContent() {
             <div className="space-y-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:space-y-0">
               {/* 明天预计 */}
               <Link href="/review/tomorrow" className="block">
-                <div className="bg-white border-2 border-spring-green border-opacity-30 rounded-xl p-5 hover:shadow-md hover:border-opacity-50 transition-all cursor-pointer active:shadow-sm">
+                <div
+                  className="rounded-xl p-5 hover:shadow-md transition-all cursor-pointer active:shadow-sm"
+                  style={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border-strong)",
+                  }}
+                >
                   <div className="flex items-start gap-3">
                     <div className="text-4xl flex-shrink-0">📩</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold mb-1 uppercase tracking-wide" style={{ color: "var(--muted)" }}>
                         明天到期
                       </p>
-                      <p className="text-3xl font-bold text-spring-green">
+                      <p className="text-3xl font-bold" style={{ color: "var(--accent)" }}>
                         {forecast.tomorrow}
                       </p>
                       <p className="text-xs mt-2 line-clamp-2" style={{ color: "var(--muted)" }}>
@@ -1197,14 +1220,20 @@ function ReviewPageContent() {
 
               {/* 进行中 */}
               <Link href="/review/progress" className="block">
-                <div className="bg-white border-2 border-spring-brown border-opacity-30 rounded-xl p-5 hover:shadow-md hover:border-opacity-50 transition-all cursor-pointer active:shadow-sm">
+                <div
+                  className="rounded-xl p-5 hover:shadow-md transition-all cursor-pointer active:shadow-sm"
+                  style={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border-strong)",
+                  }}
+                >
                   <div className="flex items-start gap-3">
                     <div className="text-4xl flex-shrink-0">🚀</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold mb-1 uppercase tracking-wide" style={{ color: "var(--muted)" }}>
                         在前进中
                       </p>
-                      <p className="text-3xl font-bold text-spring-brown">
+                      <p className="text-3xl font-bold" style={{ color: "var(--danger)" }}>
                         {forecast.inProgress}
                       </p>
                       <p className="text-xs mt-2 line-clamp-2" style={{ color: "var(--muted)" }}>
@@ -1219,14 +1248,20 @@ function ReviewPageContent() {
 
               {/* 已掌握 */}
               <Link href="/review/mastered" className="block">
-                <div className="bg-white border-2 border-spring-cream border-opacity-50 rounded-xl p-5 hover:shadow-md hover:border-opacity-70 transition-all cursor-pointer active:shadow-sm">
+                <div
+                  className="rounded-xl p-5 hover:shadow-md transition-all cursor-pointer active:shadow-sm"
+                  style={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border-strong)",
+                  }}
+                >
                   <div className="flex items-start gap-3">
                     <div className="text-4xl flex-shrink-0">🎖️</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold mb-1 uppercase tracking-wide" style={{ color: "var(--muted)" }}>
                         已掌握
                       </p>
-                      <p className="text-3xl font-bold" style={{ color: '#9b6b5c' }}>
+                      <p className="text-3xl font-bold" style={{ color: "var(--mastered)" }}>
                         {forecast.mastered}
                       </p>
                       <p className="text-xs mt-2 line-clamp-2" style={{ color: "var(--muted)" }}>
@@ -1328,7 +1363,7 @@ function ReviewPageContent() {
                         const theme = getSubjectTheme(item.note.subject ?? "未分类");
                         return (
                       <div key={item.note_id} className="pb-3">
-                      <article className="card card-anki relative mb-0" style={{ background: "#FAFAF5" }}>
+                      <article className="card card-anki relative mb-0" style={{ background: "var(--surface)" }}>
                         <span className="review-card-index">
                           {indexById.get(item.note_id)} / {total}
                         </span>
@@ -1336,7 +1371,7 @@ function ReviewPageContent() {
                           <button
                             type="button"
                             title="重新看题目"
-                            className="absolute top-2.5 right-12 flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors text-base leading-none"
+                            className="absolute top-2.5 right-12 flex items-center justify-center w-7 h-7 rounded-full text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)] transition-colors text-base leading-none"
                             onClick={() => toggleFlip(item.note_id)}
                           >
                             ↩
@@ -1414,10 +1449,10 @@ function ReviewPageContent() {
                           )}
                         </div>
                         {!isFlipped ? (
-                          <div className="note-body note-body-front text-left font-serif leading-relaxed tracking-wide text-slate-700">
+                          <div className="note-body note-body-front text-left font-serif leading-relaxed tracking-wide text-[var(--text)]">
                             <FormulaText
                               text={questionText}
-                              className="review-card-front-formula font-serif leading-relaxed tracking-wide text-slate-700"
+                              className="review-card-front-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
                               inline
                             />
                           </div>
@@ -1425,25 +1460,25 @@ function ReviewPageContent() {
                           <div className="mt-1 text-left">
                             {answerHasFocus ? (
                               <div className="grid grid-cols-1 md:grid-cols-[35%_1px_1fr] gap-0">
-                                <div className="min-w-0 bg-[#F3F1E8] p-4 md:p-6 flex items-center justify-center text-center">
+                                <div className="min-w-0 bg-[var(--surface-2)] p-4 md:p-6 flex items-center justify-center text-center">
                                   <div
-                                    className="w-full max-w-full text-lg md:text-xl font-bold font-serif leading-relaxed tracking-wide text-slate-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere] [&_.formula-text]:w-full [&_.formula-text]:max-w-full [&_.formula-text]:whitespace-pre-wrap [&_.formula-text]:break-words [&_.formula-text]:[overflow-wrap:anywhere] [&_.katex-display]:text-2xl [&_.katex-display]:overflow-x-auto [&_.katex-display]:my-0"
+                                    className="w-full max-w-full text-lg md:text-xl font-bold font-serif leading-relaxed tracking-wide text-[var(--text)] whitespace-pre-wrap break-words [overflow-wrap:anywhere] [&_.formula-text]:w-full [&_.formula-text]:max-w-full [&_.formula-text]:whitespace-pre-wrap [&_.formula-text]:break-words [&_.formula-text]:[overflow-wrap:anywhere] [&_.katex-display]:text-2xl [&_.katex-display]:overflow-x-auto [&_.katex-display]:my-0"
                                   >
                                     <FormulaText
                                       text={cardAnswerLayout.focus ?? ""}
-                                      className={answerFocusIsMath ? "memory-focus-math font-serif leading-relaxed tracking-wide text-slate-700" : "font-serif leading-relaxed tracking-wide text-slate-700"}
+                                      className={answerFocusIsMath ? "memory-focus-math font-serif leading-relaxed tracking-wide text-[var(--text)]" : "font-serif leading-relaxed tracking-wide text-[var(--text)]"}
                                     />
                                   </div>
                                 </div>
-                                <div className="hidden md:block border-r border-dashed border-[#A6B29A]" aria-hidden />
-                                <div className="min-w-0 p-4 md:p-6 text-left text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700">
+                                <div className="hidden md:block border-r border-dashed border-[var(--border-strong)]" aria-hidden />
+                                <div className="min-w-0 p-4 md:p-6 text-left text-[0.97rem] font-serif leading-relaxed tracking-wide text-[var(--text)]">
                                   {cardAnswerLayout.rest
                                     ? renderSegmentsWithCallout(cardAnswerLayout.rest, `review-card-answer-${item.note_id}`)
-                                    : <p className="text-slate-500">已提取核心锚点，无额外推演内容。</p>}
+                                    : <p className="text-[var(--muted)]">已提取核心锚点，无额外推演内容。</p>}
                                 </div>
                               </div>
                             ) : (
-                              <div className="text-left text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700">
+                              <div className="text-left text-[0.97rem] font-serif leading-relaxed tracking-wide text-[var(--text)]">
                                 {renderSegmentsWithCallout(answerText, `review-card-answer-${item.note_id}`)}
                               </div>
                             )}
@@ -1453,7 +1488,7 @@ function ReviewPageContent() {
                           {!isFlipped ? (
                             <button
                               type="button"
-                              className="btn w-full border border-[#B8C2AA] bg-[#ECE9DA] text-[#4E5A42] hover:bg-[#E6E3D1] font-sans"
+                              className="btn w-full border border-emerald-700 bg-emerald-800 text-emerald-50 hover:bg-emerald-700 font-sans"
                               onClick={() => toggleFlip(item.note_id)}
                             >
                               Show Answer
@@ -1502,22 +1537,22 @@ function ReviewPageContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setRecallItem(null)}>
           <div className="absolute inset-0 bg-black/35" aria-hidden />
           <div
-            className="relative w-full max-w-3xl rounded-2xl bg-[#FAFAF5] text-slate-800 shadow-[0_18px_50px_rgba(15,23,42,0.22)]"
+            className="relative w-full max-w-3xl rounded-2xl bg-[var(--surface)] text-[var(--text)] shadow-[0_18px_50px_rgba(15,23,42,0.22)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-[#E3E4D8] px-6 py-4">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-6 py-4">
               <div className="min-w-0">
-                <h4 className="max-w-[60ch] text-xl sm:text-[1.4rem] font-semibold font-serif leading-relaxed tracking-wide text-slate-700 break-words" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                <h4 className="max-w-[60ch] text-xl sm:text-[1.4rem] font-semibold font-serif leading-relaxed tracking-wide text-[var(--text)] break-words" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                   <FormulaText
                     text={recallItem.note.question || recallItem.note.front}
                     inline
-                    className="recall-title-formula font-serif leading-relaxed tracking-wide text-slate-700"
+                    className="recall-title-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
                   />
                 </h4>
               </div>
               <button
                 type="button"
-                className="shrink-0 rounded-lg border border-[#D4D6C8] px-2.5 py-1 text-xs text-slate-500 hover:bg-[#F1F1E8] font-sans"
+                className="shrink-0 rounded-lg border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--surface-hover)] font-sans"
                 onClick={() => setRecallItem(null)}
                 aria-label="关闭"
               >
@@ -1527,7 +1562,7 @@ function ReviewPageContent() {
 
             <div ref={recallContentRef} className="max-h-[72vh] overflow-y-auto px-6 py-5">
               {isEditing ? (
-                <div className="rounded-2xl border border-[#DADCCF] bg-white/80 p-4 sm:p-5">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:p-5">
                   <NotebookEditor
                     initialData={{
                       front: recallItem.note.front,
@@ -1549,13 +1584,13 @@ function ReviewPageContent() {
                 </div>
               ) : !hasDeepStudyInfo(recallItem) ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-[var(--muted)]">
                     这张卡片当时还没有记录“深化学习”信息。
                   </p>
                   <button
                     type="button"
                     onClick={() => setIsEditing(true)}
-                    className="rounded-lg border border-[#D4D6C8] bg-[#F2F2E8] px-3 py-1.5 text-xs font-semibold text-slate-600 font-sans"
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--text)] font-sans hover:bg-[var(--surface-hover)]"
                   >
                     补充深化记忆
                   </button>
@@ -1566,7 +1601,7 @@ function ReviewPageContent() {
                     <button
                       type="button"
                       onClick={() => setIsEditing(true)}
-                      className="rounded-lg border border-[#D4D6C8] bg-[#F2F2E8] px-3 py-1.5 text-xs font-semibold text-slate-600 font-sans"
+                      className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--text)] font-sans hover:bg-[var(--surface-hover)]"
                     >
                       ✏️ 编辑
                     </button>
@@ -1574,17 +1609,17 @@ function ReviewPageContent() {
 
                   <section className="grid grid-cols-[minmax(130px,34%)_1fr] items-start gap-4 md:gap-6">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold tracking-widest text-[#7A8B7C] uppercase mb-2">记忆泡泡</p>
+                      <p className="text-xs font-semibold tracking-widest text-[var(--muted)] uppercase mb-2">记忆泡泡</p>
                       <div className="flex flex-col gap-2">
                         {recallAnswerLayout.hasFocus && (
                           <span
-                            className="inline-flex items-center gap-2 self-start rounded-full border border-[#9BAA95]/55 bg-[#E7ECDF]/85 px-3 py-1.5 text-sm font-semibold font-serif leading-relaxed tracking-wide text-slate-700 shadow-[0_8px_24px_rgb(0,0,0,0.06)] backdrop-blur-sm"
+                            className="inline-flex items-center gap-2 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-1.5 text-sm font-semibold font-serif leading-relaxed tracking-wide text-[var(--text)] shadow-[0_8px_24px_rgb(0,0,0,0.06)] backdrop-blur-sm"
                             style={{ fontFamily: WENKAI_CONTENT_FONT }}
                           >
                             <span aria-hidden>🔖</span>
                             <FormulaText
                               text={recallAnswerLayout.focus ?? ""}
-                              className={recallAnswerLayout.focusIsMath ? "memory-focus-math leading-relaxed tracking-wide text-slate-700" : "leading-relaxed tracking-wide text-slate-700"}
+                              className={recallAnswerLayout.focusIsMath ? "memory-focus-math leading-relaxed tracking-wide text-[var(--text)]" : "leading-relaxed tracking-wide text-[var(--text)]"}
                             />
                           </span>
                         )}
@@ -1599,12 +1634,12 @@ function ReviewPageContent() {
                     </div>
 
                     <div className="min-w-0">
-                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-2 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#B96D5C]/35 before:-z-10">核心答案</p>
-                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-slate-700 recall-derivation-zone" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-3 mt-2 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#B96D5C]/35 before:-z-10">核心答案</p>
+                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-[var(--text)] recall-derivation-zone" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                         {recallAnswerLayout.hasFocus
                           ? (recallAnswerLayout.rest
                               ? renderSegmentsWithCallout(recallAnswerLayout.rest, "recall-answer")
-                              : <p className="text-slate-500">已提取核心锚点，无额外推演内容。</p>)
+                              : <p className="text-[var(--muted)]">已提取核心锚点，无额外推演内容。</p>)
                           : renderSegmentsWithCallout(recallItem.note.coreAnswer ?? "", "recall-answer")}
                       </div>
                     </div>
@@ -1612,8 +1647,8 @@ function ReviewPageContent() {
 
                   {recallItem.note.keyPoints && recallItem.note.keyPoints.length > 0 && (
                     <section>
-                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">关键点</p>
-                      <ul className="mt-1 list-disc pl-5 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-slate-700 marker:text-[#5F7865]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">关键点</p>
+                      <ul className="mt-1 list-disc pl-5 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-[var(--text)] marker:text-[var(--accent)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                         {(recallItem.note.keyPoints ?? []).map((point, idx) => (
                           <li key={`${idx}-${point}`}><FormulaText text={point} className="note-card-keypoint-formula" /></li>
                         ))}
@@ -1623,15 +1658,15 @@ function ReviewPageContent() {
 
                   {recallItem.note.examples && (
                     <section>
-                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">示例 / 应用场景</p>
-                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}><FormulaText text={recallItem.note.examples ?? ""} /></div>
+                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">示例 / 应用场景</p>
+                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}><FormulaText text={recallItem.note.examples ?? ""} /></div>
                     </section>
                   )}
 
                   {recallItem.note.commonMistakes && (
                     <section>
-                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">易错点 / 常见误区</p>
-                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                      <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">易错点 / 常见误区</p>
+                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                         {renderSegmentsWithCallout(recallItem.note.commonMistakes ?? "", "recall-mistakes")}
                       </div>
                     </section>
@@ -1639,12 +1674,12 @@ function ReviewPageContent() {
 
                   {recallItem.note.images && recallItem.note.images.length > 0 && (
                     <section>
-                      <p className="text-sm font-semibold tracking-widest text-[#7A8B7C] uppercase mb-3 mt-6">图片 / 链接</p>
+                      <p className="text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-3 mt-6">图片 / 链接</p>
                       <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 justify-items-start sm:justify-items-center">
                         {recallItem.note.images.map((src, idx) => (
                           <div
                             key={`${idx}-${src}`}
-                            className="block w-full max-w-sm rounded-lg border border-[#DADCCF] bg-[#F3F4EB] p-2 hover:shadow-sm transition-shadow"
+                            className="block w-full max-w-sm rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-2 hover:shadow-sm transition-shadow"
                           >
                             <button
                               type="button"

@@ -27,10 +27,10 @@ function getRhythmState(date = new Date()): RhythmState {
       title: "记忆活跃·宜复习新知识",
       description: "前额叶更清醒，适合高强度编码与主动回忆。",
       palette: {
-        border: "border-amber-100/60",
-        background: "bg-orange-50/50",
-        title: "text-orange-700",
-        badge: "text-amber-700",
+        border: "border-amber-200/70 dark:border-amber-400/35",
+        background: "bg-amber-50/65 dark:bg-amber-950/35",
+        title: "text-amber-800 dark:text-amber-200",
+        badge: "text-amber-800 dark:text-amber-200",
       },
     };
   }
@@ -41,10 +41,10 @@ function getRhythmState(date = new Date()): RhythmState {
       title: "脑波平缓·宜复盘入睡",
       description: "轻量复盘后留白休息，让记忆在夜间完成巩固。",
       palette: {
-        border: "border-indigo-100/60",
-        background: "bg-indigo-50/50",
-        title: "text-indigo-700",
-        badge: "text-indigo-700",
+        border: "border-indigo-200/70 dark:border-indigo-300/35",
+        background: "bg-indigo-100/60 dark:bg-indigo-950/45",
+        title: "text-indigo-800 dark:text-indigo-100",
+        badge: "text-indigo-800 dark:text-indigo-100",
       },
     };
   }
@@ -54,10 +54,10 @@ function getRhythmState(date = new Date()): RhythmState {
     title: "保持节奏·宜整理与串联",
     description: "把碎片知识连成路径，给下一次输出做准备。",
     palette: {
-      border: "border-emerald-100/60",
-      background: "bg-emerald-50/50",
-      title: "text-emerald-700",
-      badge: "text-emerald-700",
+      border: "border-emerald-200/70 dark:border-emerald-400/35",
+      background: "bg-emerald-50/60 dark:bg-emerald-950/35",
+      title: "text-emerald-800 dark:text-emerald-200",
+      badge: "text-emerald-800 dark:text-emerald-200",
     },
   };
 }
@@ -96,7 +96,7 @@ export function BioClockWidget({ mode = "sidebar" }: BioClockWidgetProps) {
           <p className={["mt-1 text-[0.8rem] font-medium leading-snug", rhythm.palette.title].join(" ")}>
             {rhythm.title}
           </p>
-          <p className="mt-1 text-[0.72rem] leading-relaxed text-gray-500">{rhythm.description}</p>
+          <p className="mt-1 text-[0.72rem] leading-relaxed text-[var(--muted)]">{rhythm.description}</p>
         </>
       ) : (
         <p className={["text-[0.78rem] font-medium leading-snug", rhythm.palette.title].join(" ")}>

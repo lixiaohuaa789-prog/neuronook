@@ -111,7 +111,7 @@ type FlashcardImportResult = {
   examples: string;
 };
 
-const FLASHCARD_FIELD_HEADER = /(^###\s*\d+\.\s*(核心问题|核心答案|关键点|易错点\s*\/\s*常见误区|示例\s*\/\s*应用场景))|(^\*\*题目[：:])|(^###\s*核心解析)/m;
+const FLASHCARD_FIELD_HEADER = /(^###\s*\d+\.\s*(核心问题|核心答案|关键点|易错点\s*\/\s*常见误区|示例\s*\/\s*应用场景))|(^\*\*题目[：:])|(^###\s*核心解析)|(^【\s*(正面|背面|大白话解释|通俗解释|避坑指南)\s*】)/m;
 
 function stripCodeFence(raw: string): string {
   const text = raw.trim();
@@ -128,6 +128,39 @@ function parseFlashcardTemplate(raw: string): FlashcardImportResult {
   while ((match = sectionRegex.exec(text)) !== null) {
     const title = match[1].replace(/\s+/g, "");
     sections[title] = (match[2] || "").trim();
+  }
+
+  // 兼容方括号模板：
+  // 【正面】... 【背面】... 【大白话解释】... 【避坑指南】...
+  if (Object.keys(sections).length === 0) {
+    const bracketSections: Record<string, string> = {};
+    const bracketRegex = /(?:^|\n)【\s*(正面|背面|大白话解释|通俗解释|避坑指南)\s*】\s*\n?([\s\S]*?)(?=(?:\n【\s*(?:正面|背面|大白话解释|通俗解释|避坑指南)\s*】)|$)/g;
+
+    while ((match = bracketRegex.exec(text)) !== null) {
+      const title = (match[1] || "").replace(/\s+/g, "");
+      bracketSections[title] = (match[2] || "").trim();
+    }
+
+    if (Object.keys(bracketSections).length > 0) {
+      const question = cleanMarkdownInline(bracketSections["正面"] || "");
+      const coreAnswer = (bracketSections["背面"] || "").trim();
+      const commonMistakes = (bracketSections["避坑指南"] || "").trim();
+      const examples = (bracketSections["大白话解释"] || bracketSections["通俗解释"] || "").trim();
+
+      const keyPoints = coreAnswer
+        .split(/\r?\n/)
+        .map(normalizeBulletLine)
+        .filter(Boolean)
+        .slice(0, 8);
+
+      return {
+        question,
+        coreAnswer,
+        keyPoints,
+        commonMistakes,
+        examples,
+      };
+    }
   }
 
   // 兼容新版模板：
@@ -230,10 +263,17 @@ function splitFlashcardChunks(raw: string): string[] {
   const anchors = [...text.matchAll(/(^|\n)###\s*1\.\s*核心问题\s*\n/g)];
   // 兼容新版模板：按“**题目：”切片
   const titleAnchors = [...text.matchAll(/(^|\n)\*\*题目[：:]/g)];
+  // 兼容方括号模板：按“【正面】”切片
+  const bracketAnchors = [...text.matchAll(/(^|\n)【\s*正面\s*】/g)];
 
-  if (anchors.length <= 1 && titleAnchors.length <= 1) return [text.trim()];
+  if (anchors.length <= 1 && titleAnchors.length <= 1 && bracketAnchors.length <= 1) return [text.trim()];
 
-  const chosenAnchors = anchors.length > 1 ? anchors : titleAnchors;
+  const chosenAnchors =
+    anchors.length > 1
+      ? anchors
+      : titleAnchors.length > 1
+        ? titleAnchors
+        : bracketAnchors;
 
   const chunks: string[] = [];
   for (let i = 0; i < chosenAnchors.length; i++) {
@@ -560,7 +600,7 @@ export function NotebookEditor({
     const parsedList = parseFlashcardTemplates(source);
 
     if (parsedList.length === 0) {
-      alert("未识别到模板字段，请检查是否包含“### 1. 核心问题”到“### 5. 示例 / 应用场景”");
+      alert("未识别到模板字段，请检查是否包含“### 1. 核心问题”到“### 5. 示例 / 应用场景”，或“【正面】/【背面】/【大白话解释】/【避坑指南】”");
       return;
     }
 
@@ -787,7 +827,7 @@ export function NotebookEditor({
                   }}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                     subject === s
-                      ? "bg-[var(--accent)] text-white shadow-md"
+                      ? "bg-emerald-800 text-emerald-50 shadow-md"
                       : "bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] border border-transparent"
                   }`}
                 >
@@ -822,7 +862,7 @@ export function NotebookEditor({
                         }}
                         className={`px-4 py-2 pr-7 rounded-lg font-medium text-sm transition-all ${
                           subject === s
-                            ? "bg-[var(--accent)] text-white shadow-md"
+                            ? "bg-emerald-800 text-emerald-50 shadow-md"
                             : "bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] border border-transparent"
                         }`}
                       >
@@ -884,7 +924,7 @@ export function NotebookEditor({
                   onClick={() => setDifficulty(opt.value)}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all inline-flex items-center gap-2 ${
                     difficulty === opt.value
-                      ? "bg-[var(--accent)] text-white shadow-md"
+                      ? "bg-emerald-800 text-emerald-50 shadow-md"
                       : "bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--accent)] border border-transparent"
                   }`}
                 >
@@ -1106,7 +1146,7 @@ export function NotebookEditor({
           <div className="flex items-start justify-between gap-4 pb-4 border-b border-[var(--border)]">
             <div className="flex-1">
               <div className="flex gap-2 mb-3">
-                <span className="inline-block px-3 py-1 bg-[var(--accent)] text-white text-xs font-medium rounded-full">
+                <span className="inline-block px-3 py-1 bg-emerald-800 text-emerald-50 text-xs font-medium rounded-full">
                   {subject}
                 </span>
                 <span className="inline-block px-3 py-1 bg-[var(--surface-2)] text-[var(--text)] text-xs font-medium rounded-full">
@@ -1254,7 +1294,7 @@ export function NotebookEditor({
           type="button"
           onClick={handleSubmit}
                       disabled={submitState !== "idle" || uploadingCount > 0}
-          className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 active:scale-95 transition-all shadow-md disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+          className="px-6 py-2 bg-emerald-800 text-emerald-50 rounded-lg font-medium hover:bg-emerald-700 active:scale-95 transition-all shadow-md disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
         >
                       {uploadingCount > 0
                         ? `图片上传中（${uploadingCount}）`

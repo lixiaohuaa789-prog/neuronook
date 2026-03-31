@@ -28,6 +28,32 @@
   --shadow-card: 0 2px 8px rgba(55, 53, 47, 0.06);
   --font: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.dark {
+  --bg: #0f1417;
+  --bg-page: #11181d;
+  --sidebar-bg: #141c21;
+  --surface: #182128;
+  --surface-2: #1f2a32;
+  --surface-hover: #26343e;
+  --border: rgba(148, 173, 160, 0.18);
+  --border-strong: rgba(148, 173, 160, 0.3);
+  --text: #dbe5df;
+  --muted: #9caea5;
+  --accent: #8db39f;
+  --accent-soft: rgba(141, 179, 159, 0.18);
+  --success: #a4bf8d;
+  --success-soft: rgba(164, 191, 141, 0.18);
+  --danger: #cf9583;
+  --danger-soft: rgba(207, 149, 131, 0.16);
+  --warm: #d8c68f;
+  --warm-soft: rgba(216, 198, 143, 0.16);
+  --mastered: #d5b886;
+  --mastered-soft: rgba(213, 184, 134, 0.17);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 
 * {
@@ -43,6 +69,7 @@ body {
   font-family: var(--font);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 /* Keep prose airy in serif blocks while formulas stay compact and readable. */

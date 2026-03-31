@@ -80,10 +80,10 @@ export function AppNav({
             href={href}
             className={[
               "group flex items-center gap-3 rounded-xl px-3 py-2.5 no-underline transition-all duration-200",
-              "hover:bg-gray-100/50 hover:text-gray-900",
+              "hover:bg-[var(--surface-hover)] hover:text-[var(--text)]",
               active
-                ? "border border-gray-100/80 bg-white text-emerald-600 font-semibold shadow-sm"
-                : "border border-transparent text-gray-500 font-medium",
+                ? "border border-[var(--border)] bg-[var(--surface)] text-emerald-500 font-semibold shadow-sm"
+                : "border border-transparent text-[var(--muted)] font-medium",
             ].join(" ")}
             title={title}
             data-active={active ? "true" : "false"}
@@ -92,7 +92,7 @@ export function AppNav({
             <span
               className={[
                 "inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
-                active ? "text-emerald-500" : "text-gray-400 group-hover:text-gray-700",
+                active ? "text-emerald-500" : "text-[var(--muted)] group-hover:text-[var(--text)]",
               ].join(" ")}
               aria-hidden
             >
@@ -103,7 +103,7 @@ export function AppNav({
               <span
                 className={[
                   "mt-0.5 block whitespace-normal break-words text-[0.7rem] font-medium leading-tight",
-                  active ? "text-emerald-500/90" : "text-gray-400 group-hover:text-gray-500",
+                  active ? "text-emerald-500/90" : "text-[var(--muted)] group-hover:text-[var(--muted)]/90",
                 ].join(" ")}
               >
                 {subtitle}
@@ -125,12 +125,12 @@ export function AppNav({
         <CloudSyncPanel compact />
       </div>
 
-      <div className="mt-4 border-t border-gray-200/70 pt-4">
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
         <BioClockWidget mode="appnav" />
       </div>
 
-      <div className="mt-4 border-t border-gray-200/70 pt-3">
-        <p className="whitespace-normal break-words text-[0.68rem] font-medium tracking-wide text-gray-400">
+      <div className="mt-4 border-t border-[var(--border)] pt-3">
+        <p className="whitespace-normal break-words text-[0.68rem] font-medium tracking-wide text-[var(--muted)]">
           本地优先 · 可选端到端云备份
         </p>
       </div>

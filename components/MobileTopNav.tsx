@@ -3,7 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { AppNav } from "./AppNav";
+import { useTheme } from "./ThemeProvider";
 import avatarImage from "../icon/yjtp.png";
 
 export function MobileTopNav() {
@@ -12,10 +14,11 @@ export function MobileTopNav() {
   const [mounted, setMounted] = useState(false);
   const drawerRef = useRef<HTMLElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   const brandBlock = (
     <>
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/90 shadow-sm ring-1 ring-gray-200/80">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--surface)] shadow-sm ring-1 ring-[var(--border)]">
         <Image
           src={avatarImage}
           alt="头像"
@@ -23,9 +26,9 @@ export function MobileTopNav() {
           priority
         />
       </span>
-      <span className="flex min-w-0 flex-col leading-tight text-gray-800">
+      <span className="flex min-w-0 flex-col leading-tight text-[var(--text)]">
         <span className="break-words text-[0.95rem] font-bold tracking-tight">NeuroNook</span>
-        <small className="whitespace-normal break-words text-[0.68rem] font-medium leading-snug text-gray-500">
+        <small className="whitespace-normal break-words text-[0.68rem] font-medium leading-snug text-[var(--muted)]">
           It&apos;s Okay to not to be Okay🤍
         </small>
       </span>
@@ -83,7 +86,7 @@ export function MobileTopNav() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-gray-200/70 bg-gray-50/90 px-4 py-3 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--sidebar-bg)]/90 px-4 py-3 backdrop-blur lg:hidden">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
           <Link
             href="/"
@@ -91,16 +94,27 @@ export function MobileTopNav() {
           >
             {brandBlock}
           </Link>
-          <button
-            type="button"
-            onClick={openDrawer}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200/80 bg-white/80 text-gray-700 transition-all duration-200 active:scale-95"
-            aria-label="打开导航菜单"
-            aria-expanded={open && mounted}
-            aria-controls="mobile-nav-drawer"
-          >
-            <span aria-hidden className="text-lg leading-none">☰</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-all duration-200 active:scale-95"
+              aria-label="切换深色主题"
+              title={`当前主题：${resolvedTheme === "dark" ? "深色" : "浅色"}`}
+            >
+              {resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
+              type="button"
+              onClick={openDrawer}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-all duration-200 active:scale-95"
+              aria-label="打开导航菜单"
+              aria-expanded={open && mounted}
+              aria-controls="mobile-nav-drawer"
+            >
+              <span aria-hidden className="text-lg leading-none">☰</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -115,12 +129,12 @@ export function MobileTopNav() {
           <aside
             id="mobile-nav-drawer"
             ref={drawerRef}
-            className={`absolute right-0 top-0 h-full w-[82vw] max-w-[340px] overflow-y-auto border-l border-gray-200/70 bg-gray-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}
+            className={`absolute right-0 top-0 h-full w-[82vw] max-w-[340px] overflow-y-auto border-l border-[var(--border)] bg-[var(--sidebar-bg)]/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}
           >
-            <div className="mb-4 flex items-start justify-between gap-3 border-b border-gray-200/70 pb-3">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-[var(--border)] pb-3">
               <Link
                 href="/"
-                className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-gray-800 no-underline"
+                className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-[var(--text)] no-underline"
                 onClick={closeDrawer}
               >
                 {brandBlock}
@@ -128,7 +142,7 @@ export function MobileTopNav() {
               <button
                 type="button"
                 onClick={closeDrawer}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 bg-white/80 text-gray-500"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
                 aria-label="关闭导航菜单"
               >
                 ×
