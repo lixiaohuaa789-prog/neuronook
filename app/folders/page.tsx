@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FormulaText } from "../../components/FormulaText";
+import { MarkdownMathContent } from "../../components/MarkdownMathContent";
 import {
   addFolder,
   addFolderNode,
@@ -525,6 +526,7 @@ export default function FoldersPage() {
 
   useEffect(() => {
     setPinnedFolderIds((prev) => {
+      if (folders.length === 0) return prev;
       const validIds = new Set(folders.map((folder) => folder.id));
       const next = new Set<string>();
       prev.forEach((id) => {
@@ -1093,10 +1095,11 @@ export default function FoldersPage() {
                                             核心答案
                                           </span>
                                         </p>
-                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]">
-                                          <span style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                                            <FormulaText text={displayAnswer} inline />
-                                          </span>
+                                        <div
+                                          className="min-w-0 break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]"
+                                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
+                                        >
+                                          <MarkdownMathContent content={displayAnswer} className="review-card-back-formula" />
                                         </div>
                                       </section>
                                     )}
@@ -1113,11 +1116,11 @@ export default function FoldersPage() {
                                             <li key={`${note.id}-kp-${idx}`} className="flex min-w-0 gap-2 text-sm text-[var(--text)]">
                                               <span className="min-w-4 font-semibold text-[var(--accent)]">{idx + 1}.</span>
                                               <span
-                                                className="min-w-0 flex-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify"
+                                                className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-justify"
                                                 style={{ fontFamily: WENKAI_CONTENT_FONT }}
                                               >
                                                 <span className="block max-w-full overflow-x-auto">
-                                                  <FormulaText text={point} inline className="note-card-keypoint-formula" />
+                                                  <MarkdownMathContent content={point} className="note-card-keypoint-formula" />
                                                 </span>
                                               </span>
                                             </li>
@@ -1133,8 +1136,11 @@ export default function FoldersPage() {
                                             易错点
                                           </span>
                                         </p>
-                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                                          <FormulaText text={note.commonMistakes} inline className="note-card-mistakes-formula" />
+                                        <div
+                                          className="min-w-0 break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]"
+                                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
+                                        >
+                                          <MarkdownMathContent content={note.commonMistakes} className="note-card-mistakes-formula" />
                                         </div>
                                       </section>
                                     )}
@@ -1146,8 +1152,11 @@ export default function FoldersPage() {
                                             示例应用
                                           </span>
                                         </p>
-                                        <div className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                                          <FormulaText text={note.examples} />
+                                        <div
+                                          className="min-w-0 break-words [overflow-wrap:anywhere] text-justify text-sm leading-relaxed text-[var(--text)]"
+                                          style={{ fontFamily: WENKAI_CONTENT_FONT }}
+                                        >
+                                          <MarkdownMathContent content={note.examples} />
                                         </div>
                                       </section>
                                     )}

@@ -730,7 +730,7 @@ export default function GalaxyPage() {
                 "radial-gradient(circle at 12% 18%, rgba(25,53,92,0.45) 0%, rgba(6,14,26,0.94) 38%, rgba(3,8,18,1) 100%)",
             }}
           >
-          <div className="absolute left-3 top-3 z-30 flex items-center gap-2">
+          <div className="absolute right-3 top-3 z-30 flex items-center gap-2">
             <div className="inline-flex items-center gap-1 rounded-md border border-slate-500/45 bg-slate-900/55 p-1 text-[11px] text-slate-200 backdrop-blur">
               <button
                 type="button"
@@ -803,7 +803,10 @@ export default function GalaxyPage() {
               style={popupStyle}
             >
               <div className="mb-1 flex items-start justify-between gap-2">
-                <div className="line-clamp-2 text-sm font-semibold text-slate-100" style={{ lineHeight: "1.4" }}>
+                <div
+                  className="text-sm font-semibold text-slate-100 whitespace-normal break-words [overflow-wrap:anywhere]"
+                  style={{ lineHeight: "1.4", textAlign: "justify" }}
+                >
                   <FormulaTextClient text={selectedNode.label} inline={true} />
                 </div>
                 <button

@@ -379,7 +379,10 @@ export function NotebookEditor({
 
   const addKeyPoint = () => setKeyPoints([...keyPoints, ""]);
   const removeKeyPoint = (index: number) => {
-    if (keyPoints.length <= 1) return;
+    if (keyPoints.length <= 1) {
+      setKeyPoints([""]);
+      return;
+    }
     setKeyPoints(keyPoints.filter((_, i) => i !== index));
   };
 

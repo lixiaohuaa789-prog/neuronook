@@ -281,7 +281,7 @@ function getNodePathIds(folder: FolderTree | null, targetNodeId: string): Set<st
 const NODE_STATUS_STYLE: Record<NodeStatus, { border: string; dotColor: string; label: string }> = {
   weak:     { border: "#d86f5b", dotColor: "#d14f4f", label: "薄弱" },
   progress: { border: "#d6b26b", dotColor: "#d9ad45", label: "巩固中" },
-  mastered: { border: "#8ea57d", dotColor: "#6db58d", label: "已掌握" },
+  mastered: { border: "#8ea57d", dotColor: "#5F8473", label: "已掌握" },
   empty:    { border: "var(--border)", dotColor: "#c9cfc2", label: "无卡片" },
 };
 
@@ -533,6 +533,7 @@ function ReviewPageContent() {
   }, [recallItem]);
 
   const onReview = (noteId: number, remembered: boolean) => {
+    const currentScrollY = window.scrollY;
     const prev = items.find((i) => i.note_id === noteId);
     const finishFour =
       remembered && prev?.status === "reviewing" && prev?.step === 3;
@@ -547,6 +548,11 @@ function ReviewPageContent() {
             : allFrameworkItems)
       : getReviewQueue();
     setItems(nextItems);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: currentScrollY, behavior: "auto" });
+      });
+    });
 
     if (nextItems.length === 0) {
       // 简单的「撒花」动效：不依赖第三方库。
@@ -565,6 +571,7 @@ function ReviewPageContent() {
     feedback: "forgot" | "hard" | "easy"
   ) => {
     if (feedback === "hard") {
+      const currentScrollY = window.scrollY;
       submitReview(noteId, "hard");
 
       const allFrameworkItems = getFrameworkReviewQueue();
@@ -576,6 +583,11 @@ function ReviewPageContent() {
               : allFrameworkItems)
         : getReviewQueue();
       setItems(nextItems);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: currentScrollY, behavior: "auto" });
+        });
+      });
       setToast("已记录模糊 · 将在明天或 5 分钟后再次出现");
       return;
     }
@@ -1081,15 +1093,24 @@ function ReviewPageContent() {
 
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
             {/* 待复习 */}
-            <div className="flex flex-col items-center p-3 rounded-lg bg-spring-bg">
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById("review-subject-sections")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              }}
+              className="flex flex-col items-center p-3 rounded-lg bg-spring-bg hover:brightness-[0.98] transition"
+            >
               <div className="text-2xl font-bold text-spring-green mb-1">{todayStats.pending}</div>
               <div className="text-xs text-center" style={{ color: "var(--text)" }}>
                 待复习
               </div>
               <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-                现在开始
+                点击查看
               </div>
-            </div>
+            </button>
 
             {/* 已记住 */}
             <Link
@@ -1110,7 +1131,8 @@ function ReviewPageContent() {
             </Link>
 
             {/* 已遗忘 */}
-            <div
+            <Link
+              href="/review/summary?filter=forgotten"
               className="flex flex-col items-center p-3 rounded-lg"
               style={{
                 background: "var(--danger-soft)",
@@ -1122,9 +1144,9 @@ function ReviewPageContent() {
                 已遗忘
               </div>
               <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-                ↻
+                点击查看
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* 进度条 */}
@@ -1134,7 +1156,7 @@ function ReviewPageContent() {
                 <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>
                   今日完成度
                 </span>
-                <span className="text-xs font-semibold text-spring-green">
+                <span className="text-xs font-semibold" style={{ color: "var(--accent)" }}>
                   {Math.round((todayStats.processed / todayStats.total) * 100)}%
                 </span>
               </div>
@@ -1146,9 +1168,10 @@ function ReviewPageContent() {
                 }}
               >
                 <div
-                  className="h-full bg-gradient-to-r from-spring-green to-spring-green-light transition-all duration-300"
+                  className="h-full transition-all duration-300"
                   style={{
                     width: `${todayStats.processed > 0 ? Math.max((todayStats.processed / todayStats.total) * 100, 4) : 0}%`,
+                    background: "linear-gradient(90deg, var(--accent), var(--success))",
                   }}
                 />
               </div>
@@ -1304,7 +1327,7 @@ function ReviewPageContent() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div id="review-subject-sections" className="space-y-4">
         {groupedSubjects.map((group) => {
           const subjectTheme = getSubjectTheme(group.subject);
           const isCollapsed = collapsedSubjects.has(group.subject);
@@ -1363,7 +1386,7 @@ function ReviewPageContent() {
                     </div>
                   ) : (
                     <Virtuoso
-                      key={`${group.subject}-${highPriorityOnly ? "hp" : "all"}-${group.items.length}`}
+                      key={`${group.subject}-${highPriorityOnly ? "hp" : "all"}`}
                       useWindowScroll
                       totalCount={visibleCount}
                       endReached={() => {
