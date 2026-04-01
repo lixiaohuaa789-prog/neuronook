@@ -485,13 +485,19 @@ a:hover {
 }
 
 .btn-remember {
-  background: var(--success-soft);
-  color: var(--success);
-  border: 1px solid rgba(151, 163, 117, 0.28);
+  background: linear-gradient(180deg, #78946e 0%, #6e8664 100%);
+  color: #ffffff;
+  border: 1px solid rgba(90, 112, 82, 0.7);
 }
 
 .btn-remember:hover {
-  filter: brightness(0.97);
+  filter: brightness(1.05);
+}
+
+.dark .btn-remember {
+  background: linear-gradient(180deg, #6f8f74 0%, #5f7b67 100%);
+  color: #ffffff;
+  border: 1px solid rgba(102, 134, 112, 0.85);
 }
 
 .btn-forget {

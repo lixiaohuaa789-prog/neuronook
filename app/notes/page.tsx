@@ -318,10 +318,10 @@ function NotesPageContent() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const handleAddNote = (data: NewNoteInput) => {
+  const handleAddNote = (data: NewNoteInput): boolean => {
     if (addNoteLockRef.current) {
       setToast("⏳ 正在保存，请勿重复点击");
-      return;
+      return false;
     }
 
     addNoteLockRef.current = true;
@@ -336,9 +336,11 @@ function NotesPageContent() {
       }
 
       setNotes(getAllNotes());
+      return true;
     } catch (error) {
       console.error("[notes] addNote failed", error);
       setToast("❌ 保存失败：本地存储异常，请稍后重试");
+      return false;
     } finally {
       window.setTimeout(() => {
         addNoteLockRef.current = false;
@@ -507,19 +509,19 @@ function NotesPageContent() {
     setShowEditingNodeTree(false);
   }, [editingNote, folders]);
 
-  const handleEditSave = (data: NewNoteInput) => {
-    if (!editingNoteId) return;
+  const handleEditSave = (data: NewNoteInput): boolean => {
+    if (!editingNoteId) return false;
 
     if (editingSelectedFolderId && !editingSelectedNodeId) {
       setShowEditingNodeTree(true);
       setToast("⚠️ 已选择文件夹，请再选择一个节点后保存，或改为不关联文件夹");
-      return;
+      return false;
     }
 
     const updated = updateNote(editingNoteId, data);
     if (!updated) {
       setToast("❌ 保存失败：未找到知识点");
-      return;
+      return false;
     }
 
     let linkedInEdit = false;
@@ -550,6 +552,7 @@ function NotesPageContent() {
     setEditingNoteId(null);
     setExpandedNote(updated.id);
     setToast(toastMessage);
+    return true;
   };
 
   useEffect(() => {

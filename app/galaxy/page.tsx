@@ -69,12 +69,14 @@ type GraphRuntimeDebug = {
   prepareError: string | null;
 };
 
+type GalaxyColorMode = "risk" | "status";
+
 function clamp01(v: number): number {
   if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.min(1, v));
 }
 
-function toLevel(node: KnowledgeGalaxyNode): FamiliarityLevel {
+function toRiskLevel(node: KnowledgeGalaxyNode): FamiliarityLevel {
   const familiarity = clamp01(node.familiarity ?? 0);
   if (node.status === "isolated") return 1;
   if (node.status === "mastered" && familiarity >= 0.8) return 4;
@@ -83,6 +85,21 @@ function toLevel(node: KnowledgeGalaxyNode): FamiliarityLevel {
   if (familiarity >= 0.5) return 3;
   if (familiarity >= 0.3) return 2;
   return 1;
+}
+
+function toStatusLevel(node: KnowledgeGalaxyNode): FamiliarityLevel {
+  const status = (node.status || "").toLowerCase();
+  if (status === "isolated") return 1;
+  if (status === "mastered") return 4;
+  if (status === "progress") {
+    if (node.srsStep >= 4) return 3;
+    return 2;
+  }
+  return 2;
+}
+
+function levelByMode(node: KnowledgeGalaxyNode, mode: GalaxyColorMode): FamiliarityLevel {
+  return mode === "status" ? toStatusLevel(node) : toRiskLevel(node);
 }
 
 function levelVisual(level: FamiliarityLevel): { color: string; size: number; glow: number } {
@@ -119,6 +136,7 @@ export default function GalaxyPage() {
   const isDev = process.env.NODE_ENV !== "production";
   const router = useRouter();
   const graphRef = useRef<CosmographRef>(undefined);
+  const graphPanelRef = useRef<HTMLDivElement | null>(null);
   const graphWrapRef = useRef<HTMLDivElement | null>(null);
 
   const [data, setData] = useState<KnowledgeGalaxyData>({
@@ -145,6 +163,8 @@ export default function GalaxyPage() {
 
   const [preparedPoints, setPreparedPoints] = useState<PreparedPoint[]>([]);
   const [preparedLinks, setPreparedLinks] = useState<PreparedLink[]>([]);
+  const [colorMode, setColorMode] = useState<GalaxyColorMode>("risk");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const refresh = () => setData(getKnowledgeGalaxyData());
@@ -159,15 +179,53 @@ export default function GalaxyPage() {
 
     const resize = () => {
       const width = Math.max(340, el.clientWidth);
-      const height = width < 640 ? 460 : width < 1024 ? 520 : 560;
+      const fullscreenActive = typeof document !== "undefined" && document.fullscreenElement === graphPanelRef.current;
+      const height = fullscreenActive
+        ? Math.max(520, window.innerHeight - 8)
+        : width < 640
+          ? 460
+          : width < 1024
+            ? 520
+            : 560;
       setGraphSize({ width, height });
     };
 
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(el);
-    return () => observer.disconnect();
+    window.addEventListener("fullscreenchange", resize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("fullscreenchange", resize);
+    };
   }, []);
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setIsFullscreen(document.fullscreenElement === graphPanelRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    syncFullscreenState();
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const panel = graphPanelRef.current;
+    if (!panel) return;
+
+    try {
+      if (document.fullscreenElement === panel) {
+        await document.exitFullscreen();
+      } else {
+        await panel.requestFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen errors to avoid interrupting graph interactions.
+    }
+  };
 
   const selectedNode = useMemo(() => {
     if (selectedNodeId == null) return null;
@@ -208,7 +266,7 @@ export default function GalaxyPage() {
 
   const basePreparedPoints = useMemo<PreparedPoint[]>(() => {
     const notePoints = data.nodes.map((node) => {
-      const level = toLevel(node);
+      const level = levelByMode(node, colorMode);
       const visual = levelVisual(level);
       const folderName = normalizeFolderName(node.folderName);
 
@@ -256,7 +314,7 @@ export default function GalaxyPage() {
       ...point,
       idx,
     }));
-  }, [data.nodes]);
+  }, [colorMode, data.nodes]);
 
   const basePreparedLinks = useMemo<PreparedLink[]>(() => {
     const pointIndexById = new Map<string, number>();
@@ -613,21 +671,25 @@ export default function GalaxyPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-center">
-          <p className="text-xs" style={{ color: "var(--muted)" }}>总知识点</p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>总知识点（SRS）</p>
           <p className="text-2xl font-bold" style={{ color: "var(--text)" }}>{data.stats.total}</p>
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-center">
-          <p className="text-xs" style={{ color: "var(--muted)" }}>孤立节点</p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>孤立节点（SRS）</p>
           <p className="text-2xl font-bold text-slate-500">{data.stats.isolated}</p>
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-center">
-          <p className="text-xs" style={{ color: "var(--muted)" }}>复习中</p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>复习中（SRS）</p>
           <p className="text-2xl font-bold text-emerald-600">{data.stats.progress}</p>
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-center">
-          <p className="text-xs" style={{ color: "var(--muted)" }}>长期记忆</p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>长期记忆（SRS）</p>
           <p className="text-2xl font-bold text-cyan-500">{data.stats.mastered}</p>
         </div>
+      </div>
+
+      <div className="mb-3 rounded-xl border border-[#D6C7B1] bg-[#FFFCF5] px-3 py-2 text-xs text-[#73624C]">
+        上方是记忆状态统计（SRS）；星图节点颜色可切换为“风险等级（复习优先）”或“状态等级（长期记忆）”。
       </div>
 
       {selectedNodeId != null && (
@@ -637,33 +699,67 @@ export default function GalaxyPage() {
       )}
 
       <div
-        className="mb-4 rounded-lg border border-[#A3B18A] bg-[#FBF9F6] p-2 shadow-[0_8px_20px_rgba(79,98,66,0.15)]"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(42,59,44,0.12) 0.5px, transparent 0.5px), radial-gradient(rgba(143,161,116,0.10) 0.5px, transparent 0.5px), linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.05) 100%)",
-          backgroundSize: "4px 4px, 7px 7px, 100% 100%",
-          backgroundPosition: "0 0, 1px 2px, 0 0",
-        }}
+        ref={graphPanelRef}
+        className={isFullscreen
+          ? "relative h-full w-full overflow-hidden bg-[#020713]"
+          : "mb-4 rounded-lg border border-[#A3B18A] bg-[#FBF9F6] p-2 shadow-[0_8px_20px_rgba(79,98,66,0.15)]"
+        }
+        style={isFullscreen
+          ? {
+            margin: 0,
+            padding: 0,
+          }
+          : {
+            backgroundImage:
+              "radial-gradient(rgba(42,59,44,0.12) 0.5px, transparent 0.5px), radial-gradient(rgba(143,161,116,0.10) 0.5px, transparent 0.5px), linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.05) 100%)",
+            backgroundSize: "4px 4px, 7px 7px, 100% 100%",
+            backgroundPosition: "0 0, 1px 2px, 0 0",
+          }
+        }
       >
-        <div className="w-full overflow-hidden rounded-lg border border-[#2A3B2C]/25 shadow-[inset_0_0_0_1px_rgba(220,229,207,0.5)]">
+        <div className={isFullscreen
+          ? "h-full w-full overflow-hidden"
+          : "w-full overflow-hidden rounded-lg border border-[#2A3B2C]/25 shadow-[inset_0_0_0_1px_rgba(220,229,207,0.5)]"
+        }>
           <div
             ref={graphWrapRef}
-            className="relative w-full overflow-hidden"
+            className={isFullscreen ? "relative h-full w-full overflow-hidden" : "relative w-full overflow-hidden"}
             style={{
+              height: isFullscreen ? "100%" : graphSize.height,
               background:
                 "radial-gradient(circle at 12% 18%, rgba(25,53,92,0.45) 0%, rgba(6,14,26,0.94) 38%, rgba(3,8,18,1) 100%)",
             }}
           >
           <div className="absolute left-3 top-3 z-30 flex items-center gap-2">
-            <span className="rounded-md border border-cyan-300/25 bg-slate-900/55 px-2 py-1 text-[11px] text-cyan-100 backdrop-blur">
-              Cosmograph WebGL
-            </span>
+            <div className="inline-flex items-center gap-1 rounded-md border border-slate-500/45 bg-slate-900/55 p-1 text-[11px] text-slate-200 backdrop-blur">
+              <button
+                type="button"
+                className={`rounded px-2 py-1 transition ${colorMode === "risk" ? "bg-emerald-500/30 text-emerald-100" : "text-slate-200 hover:bg-slate-800/70"}`}
+                onClick={() => setColorMode("risk")}
+              >
+                风险着色
+              </button>
+              <button
+                type="button"
+                className={`rounded px-2 py-1 transition ${colorMode === "status" ? "bg-cyan-500/30 text-cyan-100" : "text-slate-200 hover:bg-slate-800/70"}`}
+                onClick={() => setColorMode("status")}
+              >
+                状态着色
+              </button>
+            </div>
             <button
               type="button"
               className="rounded-md border border-slate-500/50 bg-slate-900/50 px-2 py-1 text-[11px] text-slate-200 backdrop-blur hover:bg-slate-800/70"
               onClick={() => graphRef.current?.fitView(500, 55)}
             >
               全景
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-slate-500/50 bg-slate-900/50 px-2 py-1 text-[11px] text-slate-200 backdrop-blur hover:bg-slate-800/70"
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? "退出全屏" : "全屏"}
             </button>
           </div>
 
@@ -690,7 +786,7 @@ export default function GalaxyPage() {
             {...graphConfig}
             onPointClick={handlePointClick}
             onBackgroundClick={handleBackgroundClick}
-            style={{ width: graphSize.width, height: graphSize.height }}
+            style={{ width: "100%", height: isFullscreen ? "100%" : graphSize.height }}
           />
 
           {isPreparingGraph && (
@@ -775,12 +871,15 @@ export default function GalaxyPage() {
         <p className="mt-1 text-sm leading-6 text-[#73624C]">
           单击节点进入诊断模式，再次点击同一节点可退出。双指缩放和拖拽在 iPad 下可直接使用。
         </p>
+        <p className="mt-1 text-xs leading-5 text-[#8A745A]">
+          当前节点颜色：{colorMode === "risk" ? "风险等级（复习优先）" : "状态等级（长期记忆）"}。
+        </p>
           <div className="mt-2 flex flex-wrap gap-3 text-xs font-medium">
-            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#64748B" }}></span>Lv.1 陌生</span>
-            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#A855F7" }}></span>Lv.2 模糊</span>
-            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#10B981" }}></span>Lv.3 熟悉</span>
-            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#F59E0B" }}></span>Lv.4 精通</span>
-            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#EF4444" }}></span>Lv.5 需复习</span>
+            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#64748B" }}></span>Lv.1 {colorMode === "risk" ? "陌生" : "孤立"}</span>
+            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#A855F7" }}></span>Lv.2 {colorMode === "risk" ? "模糊" : "学习中"}</span>
+            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#10B981" }}></span>Lv.3 {colorMode === "risk" ? "熟悉" : "复习中"}</span>
+            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#F59E0B" }}></span>Lv.4 {colorMode === "risk" ? "精通" : "长期记忆"}</span>
+            <span className="inline-flex items-center justify-center gap-2 rounded-md border border-[#A3B18A] bg-[#FBF9F6] px-3 py-1.5 text-[#2A3B2C]"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#EF4444" }}></span>Lv.5 {colorMode === "risk" ? "需复习" : "高风险复习"}</span>
         </div>
       </div>
     </>

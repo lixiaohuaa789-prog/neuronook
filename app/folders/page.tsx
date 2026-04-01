@@ -1036,7 +1036,11 @@ export default function FoldersPage() {
                           return (
                             <article
                               key={note.id}
-                              className="overflow-hidden rounded-xl border border-[rgba(163,177,138,0.3)] bg-[rgba(255,255,255,0.75)]"
+                              className={`overflow-hidden rounded-xl border border-[rgba(163,177,138,0.3)] bg-[rgba(255,255,255,0.75)] ${
+                                isExpanded
+                                  ? "border-l-4 border-l-[#9BAD83] shadow-[inset_0_0_0_1px_rgba(94,125,79,0.15)]"
+                                  : ""
+                              }`}
                             >
                               <div className="flex items-center gap-2 px-3 py-2.5">
                                 <button

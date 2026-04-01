@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { FormulaText } from "../../components/FormulaText";
+import { MarkdownMathContent } from "../../components/MarkdownMathContent";
 import { NotebookEditor } from "../../components/NotebookEditor";
 import KeywordBubbles from "../../components/KeywordBubbles";
 import { DebugPanel } from "../../components/DebugPanel";
@@ -158,13 +159,25 @@ function splitCalloutSegments(text: string): CalloutSegment[] {
   return result;
 }
 
-function renderSegmentsWithCallout(text: string, keyPrefix: string, className?: string): ReactNode {
+function renderSegmentsWithCallout(
+  text: string,
+  keyPrefix: string,
+  className?: string,
+  renderMarkdown = false
+): ReactNode {
   const segments = splitCalloutSegments(text);
   const baseTextClass = className
     ? `whitespace-pre-wrap text-[0.97rem] leading-7 text-[var(--text)] ${className}`
     : "whitespace-pre-wrap text-[0.97rem] leading-7 text-[var(--text)]";
+  const markdownTextClass = className
+    ? `text-[0.97rem] leading-7 text-[var(--text)] ${className}`
+    : "text-[0.97rem] leading-7 text-[var(--text)]";
 
   if (segments.length === 0) {
+    if (renderMarkdown) {
+      return <MarkdownMathContent content={text} className={markdownTextClass} />;
+    }
+
     return (
       <div className={baseTextClass}>
         <FormulaText text={text} />
@@ -180,11 +193,19 @@ function renderSegmentsWithCallout(text: string, keyPrefix: string, className?: 
           className="my-4 border-l-4 border-red-400/80 bg-red-50/50 px-4 py-3 text-[0.95rem] leading-7 text-red-950/75"
         >
           <p className="text-xs font-semibold tracking-[0.14em] uppercase text-red-900/70">易错点</p>
-          <div className="mt-1 whitespace-pre-wrap">
-            <FormulaText text={segment.content} />
-          </div>
+          {renderMarkdown ? (
+            <MarkdownMathContent content={segment.content} className="mt-1" />
+          ) : (
+            <div className="mt-1 whitespace-pre-wrap">
+              <FormulaText text={segment.content} />
+            </div>
+          )}
         </aside>
       );
+    }
+
+    if (renderMarkdown) {
+      return <MarkdownMathContent key={`${keyPrefix}-text-${idx}`} content={segment.content} className={markdownTextClass} />;
     }
 
     return (
@@ -741,8 +762,8 @@ function ReviewPageContent() {
     setKeywordsByNoteId((prev) => ({ ...prev, [updated.id]: updated.keywords ?? [] }));
   };
 
-  const saveInlineEdit = (data: Parameters<typeof updateNote>[1]) => {
-    if (!recallItem) return;
+  const saveInlineEdit = (data: Parameters<typeof updateNote>[1]): boolean => {
+    if (!recallItem) return false;
 
     const updated = updateNote(recallItem.note.id, {
       ...data,
@@ -751,7 +772,7 @@ function ReviewPageContent() {
 
     if (!updated) {
       setToast("保存失败，请重试");
-      return;
+      return false;
     }
 
     setItems((prev) => prev.map((item) => (item.note.id === updated.id ? { ...item, note: updated } : item)));
@@ -759,6 +780,7 @@ function ReviewPageContent() {
     setKeywordsByNoteId((prev) => ({ ...prev, [updated.id]: updated.keywords ?? [] }));
     setIsEditing(false);
     setToast("已保存修改");
+    return true;
   };
 
   function burstConfetti() {
@@ -1117,15 +1139,21 @@ function ReviewPageContent() {
                 </span>
               </div>
               <div
-                className="w-full h-2 rounded-full overflow-hidden"
-                style={{ background: "var(--surface-2)" }}
+                className="w-full h-3 rounded-full overflow-hidden"
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                }}
               >
                 <div
                   className="h-full bg-gradient-to-r from-spring-green to-spring-green-light transition-all duration-300"
                   style={{
-                    width: `${(todayStats.processed / todayStats.total) * 100}%`,
+                    width: `${todayStats.processed > 0 ? Math.max((todayStats.processed / todayStats.total) * 100, 4) : 0}%`,
                   }}
                 />
+              </div>
+              <div className="mt-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                已完成 {todayStats.processed} / {todayStats.total}
               </div>
             </div>
           )}
@@ -1433,13 +1461,13 @@ function ReviewPageContent() {
                             <>
                               <span>🧠</span>
                               <span className="font-medium">{item.note.subject ?? "未分类"}</span>
-                              {item.note.keyPoints?.[0] && (
+                              {isFlipped && item.note.keyPoints?.[0] && (
                                 <>
                                   <span className="opacity-40">›</span>
                                       <span><FormulaText text={item.note.keyPoints[0]} inline className="review-card-meta-formula" /></span>
                                 </>
                               )}
-                              {item.note.keyPoints?.[1] && (
+                              {isFlipped && item.note.keyPoints?.[1] && (
                                 <>
                                   <span className="opacity-40">›</span>
                                       <span><FormulaText text={item.note.keyPoints[1]} inline className="review-card-meta-formula" /></span>
@@ -1628,9 +1656,9 @@ function ReviewPageContent() {
                       <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-[var(--text)] recall-derivation-zone" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                         {recallAnswerLayout.hasFocus
                           ? (recallAnswerLayout.rest
-                              ? renderSegmentsWithCallout(recallAnswerLayout.rest, "recall-answer")
+                              ? renderSegmentsWithCallout(recallAnswerLayout.rest, "recall-answer", undefined, true)
                               : <p className="text-[var(--muted)]">已提取核心锚点，无额外推演内容。</p>)
-                          : renderSegmentsWithCallout(recallItem.note.coreAnswer ?? "", "recall-answer")}
+                          : renderSegmentsWithCallout(recallItem.note.coreAnswer ?? "", "recall-answer", undefined, true)}
                       </div>
                     </div>
                   </section>
@@ -1649,7 +1677,9 @@ function ReviewPageContent() {
                   {recallItem.note.examples && (
                     <section>
                       <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">示例 / 应用场景</p>
-                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-justify text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}><FormulaText text={recallItem.note.examples ?? ""} /></div>
+                      <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                        <MarkdownMathContent content={recallItem.note.examples ?? ""} />
+                      </div>
                     </section>
                   )}
 
@@ -1657,7 +1687,7 @@ function ReviewPageContent() {
                     <section>
                       <p className="inline-block relative z-10 text-sm font-semibold tracking-widest text-[var(--muted)] uppercase mb-3 mt-6 before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-full before:h-3 before:bg-[#D4E09B]/50 before:-z-10">易错点 / 常见误区</p>
                       <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-justify text-[var(--text)]" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                        {renderSegmentsWithCallout(recallItem.note.commonMistakes ?? "", "recall-mistakes")}
+                        {renderSegmentsWithCallout(recallItem.note.commonMistakes ?? "", "recall-mistakes", undefined, true)}
                       </div>
                     </section>
                   )}

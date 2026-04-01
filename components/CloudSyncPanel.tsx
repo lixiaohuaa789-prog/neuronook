@@ -303,6 +303,14 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       return;
     }
 
+    const preConfirm = window.confirm(
+      `即将从云端恢复并${restoreMode === "overwrite" ? "覆盖" : "合并"}本地数据。\n\n是否继续？`
+    );
+    if (!preConfirm) {
+      showStatus({ type: "error", message: "已取消恢复" });
+      return;
+    }
+
     setLoading("restore");
     try {
       const raw = await downloadBackupJson(session.accessToken);
@@ -314,19 +322,11 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       const stats = parsed.meta?.stats;
       const previewNotes = typeof stats?.noteCount === "number" ? stats.noteCount : parsed.db.notes.length;
       const previewReviews = typeof stats?.reviewCount === "number" ? stats.reviewCount : parsed.db.reviews.length;
-      const previewSize = typeof stats?.totalBytesize === "number" ? stats.totalBytesize : new Blob([raw]).size;
-      const ok = window.confirm(
-        `即将从云端恢复\n笔记: ${previewNotes} 条\n复习记录: ${previewReviews} 条\n备份大小: ${formatBytes(previewSize)}\n\n是否继续？`
-      );
-      if (!ok) {
-        showStatus({ type: "error", message: "已取消恢复" });
-        return;
-      }
 
       const result = restoreFromBackupPayload(parsed, restoreMode);
       showStatus({
         type: "success",
-        message: `恢复完成：${result.notes} 条笔记 / ${result.reviews} 条复习记录`,
+        message: `恢复完成：${result.notes} 条笔记 / ${result.reviews} 条复习记录（备份含 ${previewNotes} / ${previewReviews}）`,
       });
     } catch (error) {
       showStatus({ type: "error", message: error instanceof Error ? error.message : "恢复失败" });

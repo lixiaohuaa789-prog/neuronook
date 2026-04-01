@@ -3,11 +3,12 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { NewNoteInput, Note } from "@/lib/db";
 import { FormulaText } from "@/components/FormulaText";
+import { MarkdownMathContent } from "@/components/MarkdownMathContent";
 import { isCloudinaryConfigured, uploadImageToCloudinary } from "@/lib/image-host";
 
 export interface NotebookEditorProps {
   initialData?: NewNoteInput;
-  onSubmit: (data: NewNoteInput) => void;
+  onSubmit: (data: NewNoteInput) => void | boolean | Promise<void | boolean>;
   onBatchImport?: (items: NewNoteInput[]) => void;
   onCancel?: () => void;
   submitLabel?: string;
@@ -493,7 +494,7 @@ export function NotebookEditor({
     };
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (submitState !== "idle") return;
 
     if (uploadingCount > 0) {
@@ -520,7 +521,7 @@ export function NotebookEditor({
     setSubmitState("saving");
 
     try {
-      onSubmit({
+      const result = await Promise.resolve(onSubmit({
         front: finalFront,
         content: finalContent,
         subject: finalSubject,
@@ -537,7 +538,11 @@ export function NotebookEditor({
           images.filter((img) => img.trim()).length > 0
             ? images.filter((img) => img.trim())
             : undefined,
-      });
+      }));
+
+      if (result === false) {
+        throw new Error("保存未完成，请检查必填项或稍后重试");
+      }
 
       setSubmitState("saved");
       if (submitResetTimerRef.current) {
@@ -1171,12 +1176,12 @@ export function NotebookEditor({
                   </div>
                 </div>
                 <div className="hidden md:block border-r border-dashed border-[#A3B18A]/50" aria-hidden />
-                <div className="px-3 py-3 bg-[var(--surface)] text-[var(--text)] leading-relaxed whitespace-pre-wrap">
-                  <FormulaText text={coreAnswerFocusPreview.rest} />
+                <div className="px-3 py-3 bg-[var(--surface)] text-[var(--text)] leading-relaxed">
+                  <MarkdownMathContent content={coreAnswerFocusPreview.rest} className="text-[var(--text)]" />
                 </div>
               </div>
             ) : (
-              <div className="text-[var(--text)] leading-relaxed whitespace-pre-wrap"><FormulaText text={deferredCoreAnswer} /></div>
+              <div className="text-[var(--text)] leading-relaxed"><MarkdownMathContent content={deferredCoreAnswer} className="text-[var(--text)]" /></div>
             )}
           </div>
 
@@ -1197,14 +1202,14 @@ export function NotebookEditor({
           {deferredCommonMistakes.trim() && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
               <p className="text-xs font-medium text-orange-900 mb-2">⚠️ 易错点</p>
-              <div className="text-sm text-orange-900 whitespace-pre-wrap"><FormulaText text={deferredCommonMistakes} /></div>
+              <MarkdownMathContent content={deferredCommonMistakes} className="text-sm text-orange-900" />
             </div>
           )}
 
           {deferredExamples.trim() && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <p className="text-xs font-medium text-green-900 mb-2">💡 示例</p>
-              <div className="text-sm text-green-900 whitespace-pre-wrap"><FormulaText text={deferredExamples} /></div>
+              <MarkdownMathContent content={deferredExamples} className="text-sm text-green-900" />
             </div>
           )}
 
@@ -1292,7 +1297,9 @@ export function NotebookEditor({
         )}
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={() => {
+            void handleSubmit();
+          }}
                       disabled={submitState !== "idle" || uploadingCount > 0}
           className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg font-medium hover:brightness-105 active:scale-95 transition-all shadow-md disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
         >
