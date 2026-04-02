@@ -553,6 +553,7 @@ export function NotebookEditor({
       }
       submitResetTimerRef.current = window.setTimeout(() => {
         setSubmitState("idle");
+        onCancel?.();
       }, 1200);
     } catch (error) {
       console.error("[NotebookEditor] submit failed", error);

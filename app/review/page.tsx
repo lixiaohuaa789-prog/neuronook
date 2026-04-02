@@ -433,6 +433,7 @@ function ReviewPageContent() {
   const [keywordsByNoteId, setKeywordsByNoteId] = useState<Record<number, string[]>>({});
   const [keywordDraft, setKeywordDraft] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const prevRecallNoteIdRef = useRef<number | null>(null);
   const recallContentRef = useRef<HTMLDivElement | null>(null);
 
   const buildSubjectSet = (reviewItems: Array<ReviewQueueItem | FrameworkReviewItem>) => {
@@ -703,14 +704,18 @@ function ReviewPageContent() {
   }, [recallItem, keywordsByNoteId]);
 
   useEffect(() => {
-    if (!recallItem) {
+    const prevId = prevRecallNoteIdRef.current;
+    const currId = recallItem?.note.id ?? null;
+    prevRecallNoteIdRef.current = currId;
+
+    // 只有当卡片本身切换（note.id 变化）时才重置编辑状态
+    // 保存后仅更新 recallItem 引用（同一张卡）不应关闭编辑器
+    if (currId !== prevId) {
       setKeywordDraft("");
       setIsEditing(false);
-      return;
     }
 
-    setKeywordDraft("");
-    setIsEditing(false);
+    if (!recallItem) return;
 
     setKeywordsByNoteId((prev) => {
       if (prev[recallItem.note.id]) return prev;
@@ -790,7 +795,6 @@ function ReviewPageContent() {
     setItems((prev) => prev.map((item) => (item.note.id === updated.id ? { ...item, note: updated } : item)));
     setRecallItem((prev) => (prev ? { ...prev, note: updated } : prev));
     setKeywordsByNoteId((prev) => ({ ...prev, [updated.id]: updated.keywords ?? [] }));
-    setIsEditing(false);
     setToast("已保存修改");
     return true;
   };
@@ -1214,7 +1218,8 @@ function ReviewPageContent() {
               <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
                 <Link
                   href="/notes"
-                  className="inline-flex items-center justify-center px-8 py-4 bg-[var(--accent)] text-white font-semibold rounded-xl hover:brightness-105 hover:shadow-md hover:-translate-y-1 active:translate-y-0 transition-all shadow-md min-h-12"
+                  className="inline-flex items-center justify-center px-8 py-4 bg-[var(--accent)] font-semibold rounded-xl hover:brightness-105 hover:shadow-md hover:-translate-y-1 active:translate-y-0 transition-all shadow-md min-h-12"
+                  style={{ color: "white" }}
                 >
                   ✨ 添加新知识点
                 </Link>
