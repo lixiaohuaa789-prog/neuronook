@@ -54,6 +54,8 @@ export default function MasteredPage() {
 
   useEffect(() => {
     refresh();
+    window.addEventListener("study-app-changed", refresh);
+    return () => window.removeEventListener("study-app-changed", refresh);
   }, [refresh]);
 
   useEffect(() => {

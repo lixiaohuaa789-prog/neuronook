@@ -55,6 +55,8 @@ export default function ProgressPage() {
 
   useEffect(() => {
     refresh();
+    window.addEventListener("study-app-changed", refresh);
+    return () => window.removeEventListener("study-app-changed", refresh);
   }, [refresh]);
 
   const total = items.length;

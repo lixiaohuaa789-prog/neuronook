@@ -13,9 +13,185 @@ import { compressToUTF16, decompressFromUTF16 } from "lz-string";
 
 const KEY = "study_app_data";
 const KEY_COMPRESSED = "study_app_data_lz";
+const STORAGE_BACKEND_KEY = "study_app_storage_backend";
+const IDB_NAME = "study-app-storage";
+const IDB_STORE = "app-state";
+const IDB_RECORD_KEY = "primary-db";
+
+type StorageBackend = "localStorage" | "indexedDB";
+
+type StorageBackendMeta = {
+  backend: StorageBackend;
+  updatedAt: number;
+  approxBytes: number;
+};
+
+let dbCache: StudyDB | null = null;
+let indexedDBHydrationStarted = false;
+let indexedDBWriteChain: Promise<void> = Promise.resolve();
 
 function emptyDB(): StudyDB {
   return { notes: [], reviews: [], pomodoros: [], checkins: [], reviewLogs: [], folders: [], tombstones: [] };
+}
+
+function dispatchStudyAppChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("study-app-changed"));
+  }
+}
+
+function canUseIndexedDB(): boolean {
+  return typeof indexedDB !== "undefined";
+}
+
+function readStorageBackendMeta(): StorageBackendMeta | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_BACKEND_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StorageBackendMeta>;
+    if (parsed.backend !== "localStorage" && parsed.backend !== "indexedDB") return null;
+    return {
+      backend: parsed.backend,
+      updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now(),
+      approxBytes: typeof parsed.approxBytes === "number" ? parsed.approxBytes : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStorageBackendMeta(meta: StorageBackendMeta) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_BACKEND_KEY, JSON.stringify(meta));
+}
+
+function openStorageDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("打开本地数据库失败"));
+  });
+}
+
+async function readIndexedDBSnapshot(): Promise<string | null> {
+  if (!canUseIndexedDB()) return null;
+  const db = await openStorageDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IDB_STORE, "readonly");
+    const store = transaction.objectStore(IDB_STORE);
+    const request = store.get(IDB_RECORD_KEY);
+
+    request.onsuccess = () => resolve(typeof request.result === "string" ? request.result : null);
+    request.onerror = () => reject(request.error ?? new Error("读取本地数据库失败"));
+    transaction.oncomplete = () => db.close();
+    transaction.onerror = () => db.close();
+    transaction.onabort = () => db.close();
+  });
+}
+
+async function writeIndexedDBSnapshot(raw: string): Promise<void> {
+  if (!canUseIndexedDB()) {
+    throw new Error("当前浏览器不支持大容量本地存储");
+  }
+  const db = await openStorageDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IDB_STORE, "readwrite");
+    const store = transaction.objectStore(IDB_STORE);
+    store.put(raw, IDB_RECORD_KEY);
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error ?? new Error("写入本地数据库失败"));
+    };
+    transaction.onabort = () => {
+      db.close();
+      reject(transaction.error ?? new Error("写入本地数据库失败"));
+    };
+  });
+}
+
+async function clearIndexedDBSnapshot(): Promise<void> {
+  if (!canUseIndexedDB()) return;
+  const db = await openStorageDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(IDB_STORE, "readwrite");
+    const store = transaction.objectStore(IDB_STORE);
+    store.delete(IDB_RECORD_KEY);
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error ?? new Error("清理本地数据库失败"));
+    };
+    transaction.onabort = () => {
+      db.close();
+      reject(transaction.error ?? new Error("清理本地数据库失败"));
+    };
+  });
+}
+
+function queueIndexedDBWrite(task: () => Promise<void>) {
+  indexedDBWriteChain = indexedDBWriteChain
+    .catch(() => undefined)
+    .then(task);
+  return indexedDBWriteChain;
+}
+
+function hydrateDBFromIndexedDB() {
+  if (typeof window === "undefined" || indexedDBHydrationStarted || !canUseIndexedDB()) return;
+  indexedDBHydrationStarted = true;
+
+  void readIndexedDBSnapshot()
+    .then((raw) => {
+      if (!raw) {
+        dbCache = emptyDB();
+        dispatchStudyAppChanged();
+        return;
+      }
+
+      let parsed: unknown = emptyDB();
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = emptyDB();
+      }
+      dbCache = migrateParsed(parsed);
+      dispatchStudyAppChanged();
+    })
+    .catch((error) => {
+      console.error("[db] indexedDB hydrate failed", error);
+      dbCache = emptyDB();
+      dispatchStudyAppChanged();
+    });
+}
+
+function readRawLocalSnapshot(): { raw: string | null; compressed: string | null; legacy: string | null; decompressed: string | null } {
+  const compressed = localStorage.getItem(KEY_COMPRESSED);
+  const legacy = localStorage.getItem(KEY);
+  const decompressed = compressed ? decompressFromUTF16(compressed) : null;
+  const raw = decompressed && decompressed.trim().length > 0
+    ? decompressed
+    : legacy;
+
+  return { raw, compressed, legacy, decompressed };
 }
 
 export type Note = {
@@ -252,12 +428,9 @@ function migrateParsed(raw: unknown): StudyDB {
 
 export function getDB(): StudyDB | null {
   if (typeof window === "undefined") return null;
-  const compressed = localStorage.getItem(KEY_COMPRESSED);
-  const legacy = localStorage.getItem(KEY);
-  const decompressed = compressed ? decompressFromUTF16(compressed) : null;
-  const raw = decompressed && decompressed.trim().length > 0
-    ? decompressed
-    : legacy;
+  if (dbCache) return dbCache;
+
+  const { raw, compressed, decompressed } = readRawLocalSnapshot();
 
   let parsed: unknown = emptyDB();
   if (raw) {
@@ -282,10 +455,22 @@ export function getDB(): StudyDB | null {
     }
   }
 
+  if (raw) {
+    dbCache = migrated;
+    return migrated;
+  }
+
+  const backendMeta = readStorageBackendMeta();
+  if (backendMeta?.backend === "indexedDB") {
+    hydrateDBFromIndexedDB();
+    return emptyDB();
+  }
+
+  dbCache = migrated;
   return migrated;
 }
 
-export function saveDB(db: StudyDB) {
+export function saveDB(db: StudyDB): StorageBackend {
   const compactNotes = () => {
     for (const note of db.notes) {
       if ((note.question ?? "") === (note.front ?? "")) note.question = undefined;
@@ -299,34 +484,52 @@ export function saveDB(db: StudyDB) {
     }
   };
 
-  try {
-    const json = JSON.stringify(db);
+  if (typeof window === "undefined") {
+    return "localStorage";
+  }
+
+  compactNotes();
+  dbCache = db;
+
+  const persistToLocalStorage = (json: string): StorageBackend => {
     localStorage.setItem(KEY_COMPRESSED, compressToUTF16(json));
     localStorage.removeItem(KEY);
+    writeStorageBackendMeta({ backend: "localStorage", updatedAt: Date.now(), approxBytes: new Blob([json]).size });
+    void queueIndexedDBWrite(() => clearIndexedDBSnapshot()).catch((error) => {
+      console.error("[db] indexedDB cleanup failed", error);
+    });
+    dispatchStudyAppChanged();
+    return "localStorage";
+  };
+
+  try {
+    const json = JSON.stringify(db);
+    return persistToLocalStorage(json);
   } catch (e) {
     const isQuota =
       e instanceof DOMException &&
       (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED");
     if (isQuota) {
-      // One retry after compacting duplicated/empty fields to reclaim space.
-      try {
-        compactNotes();
-        const compactJson = JSON.stringify(db);
-        localStorage.setItem(KEY_COMPRESSED, compressToUTF16(compactJson));
-        localStorage.removeItem(KEY);
-      } catch {
-        throw new Error("本地存储空间已满，图片太大或数据过多。请尝试使用图片 URL 替代直接上传，或删除部分旧数据。");
+      if (!canUseIndexedDB()) {
+        throw new Error("本地存储空间已满，且当前浏览器不支持大容量离线存储。请改用支持 IndexedDB 的浏览器后重试。");
       }
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("study-app-changed"));
-      }
-      return;
+
+      const json = JSON.stringify(db);
+      localStorage.removeItem(KEY_COMPRESSED);
+      localStorage.removeItem(KEY);
+      writeStorageBackendMeta({ backend: "indexedDB", updatedAt: Date.now(), approxBytes: new Blob([json]).size });
+      void queueIndexedDBWrite(() => writeIndexedDBSnapshot(json)).catch((error) => {
+        console.error("[db] indexedDB persist failed", error);
+      });
+      dispatchStudyAppChanged();
+      return "indexedDB";
     }
     throw e;
   }
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("study-app-changed"));
-  }
+}
+
+export function flushPendingStorageWrites(): Promise<void> {
+  return indexedDBWriteChain.catch(() => undefined);
 }
 
 export function buildBackupPayload(): BackupPayload {
@@ -455,68 +658,17 @@ function mergeDB(base: StudyDB, incoming: StudyDB): StudyDB {
   };
 }
 
-function isInlineDataImage(value: string): boolean {
-  return /^data:image\//i.test(value.trim());
-}
-
-function stripInlineImagesForQuota(db: StudyDB): {
-  compacted: StudyDB;
-  strippedImages: number;
-  strippedMemoryBubbleImages: number;
-} {
-  const compacted = JSON.parse(JSON.stringify(db)) as StudyDB;
-  let strippedImages = 0;
-  let strippedMemoryBubbleImages = 0;
-
-  for (const note of compacted.notes) {
-    if (Array.isArray(note.images) && note.images.length > 0) {
-      const kept = note.images.filter((img) => !isInlineDataImage(img));
-      strippedImages += note.images.length - kept.length;
-      note.images = kept.length > 0 ? kept : undefined;
-    }
-
-    if (Array.isArray(note.memoryBubbleImages) && note.memoryBubbleImages.length > 0) {
-      const kept = note.memoryBubbleImages.filter((img) => !isInlineDataImage(img));
-      strippedMemoryBubbleImages += note.memoryBubbleImages.length - kept.length;
-      note.memoryBubbleImages = kept.length > 0 ? kept : undefined;
-    }
-  }
-
-  return { compacted, strippedImages, strippedMemoryBubbleImages };
-}
-
 export function restoreFromBackupPayload(payload: BackupPayload, mode: RestoreMode = "overwrite") {
   const incoming = migrateParsed(payload.db);
   const current = getDB() ?? emptyDB();
   const next = mode === "overwrite" ? incoming : mergeDB(current, incoming);
-
-  let strippedImages = 0;
-  let strippedMemoryBubbleImages = 0;
-  try {
-    saveDB(next);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    const isQuotaError = message.includes("本地存储空间已满");
-    if (!isQuotaError) throw error;
-
-    const compactResult = stripInlineImagesForQuota(next);
-    strippedImages = compactResult.strippedImages;
-    strippedMemoryBubbleImages = compactResult.strippedMemoryBubbleImages;
-
-    // If no inline image can be stripped, keep the original quota error.
-    if (strippedImages + strippedMemoryBubbleImages <= 0) {
-      throw error;
-    }
-
-    saveDB(compactResult.compacted);
-  }
+  const storageBackend = saveDB(next);
 
   return {
     notes: next.notes.length,
     reviews: next.reviews.length,
     checkins: next.checkins.length,
-    strippedImages,
-    strippedMemoryBubbleImages,
+    storageBackend,
   };
 }
 

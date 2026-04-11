@@ -5,6 +5,7 @@ import { ChevronDown, Cloud } from "lucide-react";
 import { SafeTextButton } from "./SafeTextButton";
 import {
   buildBackupPayload,
+  flushPendingStorageWrites,
   restoreFromBackupPayload,
   type BackupPayload,
   type RestoreMode,
@@ -306,11 +307,11 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       }
 
       const result = restoreFromBackupPayload(parsed, restoreMode);
-      const strippedCount = (result.strippedImages ?? 0) + (result.strippedMemoryBubbleImages ?? 0);
-      const strippedHint = strippedCount > 0 ? `（为适配本地容量，已移除 ${strippedCount} 张内嵌图片）` : "";
+      await flushPendingStorageWrites();
+      const storageHint = result.storageBackend === "indexedDB" ? "（已完整保存到大容量本地存储）" : "";
       showStatus({
         type: "success",
-        message: `导入完成：${result.notes} 条笔记 / ${result.reviews} 条复习记录${strippedHint}`,
+        message: `导入完成：${result.notes} 条笔记 / ${result.reviews} 条复习记录${storageHint}`,
       });
     } catch (error) {
       showStatus({ type: "error", message: error instanceof Error ? error.message : "本地导入失败" });
@@ -415,11 +416,11 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       const previewReviews = typeof stats?.reviewCount === "number" ? stats.reviewCount : parsed.db.reviews.length;
 
       const result = restoreFromBackupPayload(parsed, restoreMode);
-      const strippedCount = (result.strippedImages ?? 0) + (result.strippedMemoryBubbleImages ?? 0);
-      const strippedHint = strippedCount > 0 ? `，已移除 ${strippedCount} 张内嵌图片以适配本地容量` : "";
+      await flushPendingStorageWrites();
+      const storageHint = result.storageBackend === "indexedDB" ? "，已完整保存到大容量本地存储" : "";
       showStatus({
         type: "success",
-        message: `恢复完成：${result.notes} 条笔记 / ${result.reviews} 条复习记录（备份含 ${previewNotes} / ${previewReviews}）${strippedHint}`,
+        message: `恢复完成：${result.notes} 条笔记 / ${result.reviews} 条复习记录（备份含 ${previewNotes} / ${previewReviews}）${storageHint}`,
       });
     } catch (error) {
       showStatus({ type: "error", message: error instanceof Error ? error.message : "恢复失败" });
