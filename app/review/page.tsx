@@ -235,6 +235,26 @@ function normalizeCodeBlock(text: string): string {
   return fenced ? fenced[1] : content;
 }
 
+function isLikelyCodeLine(line: string): boolean {
+  const text = line.trim();
+  if (!text) return false;
+  return /\b(if|else|for|while|switch|case|return|printf|int|char|float|double|void|class|function|const|let|var)\b|[{};]|<=|>=|==|!=|\+\+|--/.test(text);
+}
+
+function splitQuestionIntroAndCode(text: string): { intro: string; code: string } {
+  const normalized = normalizeCodeBlock(text);
+  const lines = normalized.split("\n");
+  const codeStart = lines.findIndex((line) => isLikelyCodeLine(line));
+
+  if (codeStart <= 0) {
+    return { intro: "", code: normalized };
+  }
+
+  const intro = lines.slice(0, codeStart).join("\n").trim();
+  const code = lines.slice(codeStart).join("\n").trim();
+  return { intro, code: code || normalized };
+}
+
 // 计算每个节点的掚弱程度（递归包含所有子节点下挂载的卡片）
 type NodeStatus = "weak" | "progress" | "mastered" | "empty";
 
@@ -455,6 +475,8 @@ function ReviewPageContent() {
   const [showImageBubbleInput, setShowImageBubbleInput] = useState(false);
   const [imageBubbleUploading, setImageBubbleUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [expandRecallTitleCode, setExpandRecallTitleCode] = useState(false);
+  const [showRecallCodeOverlay, setShowRecallCodeOverlay] = useState(false);
   const prevRecallNoteIdRef = useRef<number | null>(null);
   const recallContentRef = useRef<HTMLDivElement | null>(null);
 
@@ -515,6 +537,16 @@ function ReviewPageContent() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [recallItem, previewImage]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showRecallCodeOverlay) {
+        setShowRecallCodeOverlay(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showRecallCodeOverlay]);
 
   useEffect(() => {
     const root = recallContentRef.current;
@@ -733,6 +765,26 @@ function ReviewPageContent() {
     };
   }, [recallItem]);
 
+  const recallQuestionText = useMemo(
+    () => (recallItem?.note.question || recallItem?.note.front || "").trim(),
+    [recallItem]
+  );
+
+  const recallQuestionCodeView = useMemo(() => {
+    if (!looksLikeCodeQuestion(recallQuestionText)) {
+      return { isCode: false, intro: "", code: "", canCollapse: false };
+    }
+    const split = splitQuestionIntroAndCode(recallQuestionText);
+    const lineCount = split.code.split("\n").length;
+    const canCollapse = lineCount > 3 || split.code.length > 140;
+    return {
+      isCode: true,
+      intro: split.intro,
+      code: split.code,
+      canCollapse,
+    };
+  }, [recallQuestionText]);
+
   const activeKeywords = useMemo(() => {
     if (!recallItem) return [];
     return keywordsByNoteId[recallItem.note.id] ?? [];
@@ -761,6 +813,11 @@ function ReviewPageContent() {
       return { ...prev, [recallItem.note.id]: stored };
     });
   }, [recallItem]);
+
+  useEffect(() => {
+    setExpandRecallTitleCode(false);
+    setShowRecallCodeOverlay(false);
+  }, [recallItem?.note.id]);
 
   const addKeywordForRecall = (keyword: string) => {
     if (!recallItem) return;
@@ -1628,11 +1685,27 @@ function ReviewPageContent() {
                         {!isFlipped ? (
                           <div className="note-body note-body-front text-left font-serif leading-relaxed tracking-wide text-[var(--text)]">
                             {looksLikeCodeQuestion(questionText) ? (
-                              <div className="review-question-code">
-                                <pre>
-                                  <code>{normalizeCodeBlock(questionText)}</code>
-                                </pre>
-                              </div>
+                              (() => {
+                                const split = splitQuestionIntroAndCode(questionText);
+                                return (
+                                  <div className="space-y-2">
+                                    {split.intro ? (
+                                      <div className="review-question-intro">
+                                        <FormulaText
+                                          text={split.intro}
+                                          className="review-card-front-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
+                                          inline
+                                        />
+                                      </div>
+                                    ) : null}
+                                    <div className="review-question-code">
+                                      <pre>
+                                        <code>{split.code}</code>
+                                      </pre>
+                                    </div>
+                                  </div>
+                                );
+                              })()
                             ) : (
                               <FormulaText
                                 text={questionText}
@@ -1716,14 +1789,51 @@ function ReviewPageContent() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-6 py-4">
-              <div className="min-w-0">
-                <h4 className="max-w-[60ch] text-xl sm:text-[1.4rem] font-semibold font-serif leading-relaxed tracking-wide text-[var(--text)] break-words" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                  <FormulaText
-                    text={recallItem.note.question || recallItem.note.front}
-                    inline
-                    className="recall-title-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
-                  />
-                </h4>
+              <div className="min-w-0 flex-1">
+                {recallQuestionCodeView.isCode ? (
+                  <div className="space-y-2">
+                    {recallQuestionCodeView.intro ? (
+                      <h4 className="max-w-[60ch] text-xl sm:text-[1.4rem] font-semibold font-serif leading-relaxed tracking-wide text-[var(--text)] break-words" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                        <FormulaText
+                          text={recallQuestionCodeView.intro}
+                          inline
+                          className="recall-title-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
+                        />
+                      </h4>
+                    ) : null}
+                    <div className={["review-question-code", expandRecallTitleCode ? "max-h-[11rem]" : "max-h-[7.6rem]"].join(" ")}>
+                      <pre>
+                        <code>{recallQuestionCodeView.code}</code>
+                      </pre>
+                    </div>
+                    {recallQuestionCodeView.canCollapse && (
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setExpandRecallTitleCode((prev) => !prev)}
+                          className="text-xs font-medium text-[var(--muted)] hover:text-[var(--text)]"
+                        >
+                          {expandRecallTitleCode ? "收起代码" : "展开代码"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowRecallCodeOverlay(true)}
+                          className="text-xs font-medium text-[var(--muted)] hover:text-[var(--text)]"
+                        >
+                          全屏看代码
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <h4 className="max-w-[60ch] text-xl sm:text-[1.4rem] font-semibold font-serif leading-relaxed tracking-wide text-[var(--text)] break-words" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
+                    <FormulaText
+                      text={recallQuestionText}
+                      inline
+                      className="recall-title-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
+                    />
+                  </h4>
+                )}
               </div>
               <button
                 type="button"
@@ -1997,6 +2107,32 @@ function ReviewPageContent() {
               alt="放大预览"
               className="h-full w-full max-h-[85vh] object-contain rounded"
             />
+          </div>
+        </div>
+      )}
+
+      {showRecallCodeOverlay && recallQuestionCodeView.isCode && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={() => setShowRecallCodeOverlay(false)}>
+          <div className="absolute inset-0 bg-black/55" aria-hidden />
+          <div
+            className="relative w-full max-w-4xl max-h-[86vh] rounded-xl border border-white/20 bg-[var(--surface)] p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-[var(--text)]">题目代码（完整）</p>
+              <button
+                type="button"
+                className="rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--surface-hover)]"
+                onClick={() => setShowRecallCodeOverlay(false)}
+              >
+                关闭
+              </button>
+            </div>
+            <div className="review-question-code max-h-[72vh]">
+              <pre>
+                <code>{recallQuestionCodeView.code}</code>
+              </pre>
+            </div>
           </div>
         </div>
       )}
