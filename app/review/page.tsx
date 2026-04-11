@@ -217,6 +217,24 @@ function renderSegmentsWithCallout(
   });
 }
 
+function looksLikeCodeQuestion(text: string): boolean {
+  const content = text.trim();
+  if (!content) return false;
+  if (/```[\s\S]*```/.test(content)) return true;
+
+  const hasNewline = content.includes("\n");
+  const hasCodeSymbols = /[{};]|<=|>=|==|!=|\+\+|--/.test(content);
+  const hasCodeKeywords = /\b(if|else|for|while|switch|case|return|printf|int|char|float|double|void|class|function|const|let|var)\b/.test(content);
+
+  return hasNewline && hasCodeSymbols && hasCodeKeywords;
+}
+
+function normalizeCodeBlock(text: string): string {
+  const content = text.trim();
+  const fenced = content.match(/^```[\w-]*\n([\s\S]*?)\n```$/);
+  return fenced ? fenced[1] : content;
+}
+
 // 计算每个节点的掚弱程度（递归包含所有子节点下挂载的卡片）
 type NodeStatus = "weak" | "progress" | "mastered" | "empty";
 
@@ -1609,11 +1627,19 @@ function ReviewPageContent() {
                         </div>
                         {!isFlipped ? (
                           <div className="note-body note-body-front text-left font-serif leading-relaxed tracking-wide text-[var(--text)]">
-                            <FormulaText
-                              text={questionText}
-                              className="review-card-front-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
-                              inline
-                            />
+                            {looksLikeCodeQuestion(questionText) ? (
+                              <div className="review-question-code">
+                                <pre>
+                                  <code>{normalizeCodeBlock(questionText)}</code>
+                                </pre>
+                              </div>
+                            ) : (
+                              <FormulaText
+                                text={questionText}
+                                className="review-card-front-formula font-serif leading-relaxed tracking-wide text-[var(--text)]"
+                                inline
+                              />
+                            )}
                           </div>
                         ) : (
                           <div className="mt-1 text-left">
