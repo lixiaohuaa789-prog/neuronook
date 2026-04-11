@@ -51,6 +51,7 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
   const [loading, setLoading] = useState<"connect" | "backup" | "restore" | "import-local" | null>(null);
   const [restoreMode, setRestoreMode] = useState<RestoreMode>("overwrite");
   const [open, setOpen] = useState(!compact);
+  const [preferNativeFileInput, setPreferNativeFileInput] = useState(false);
   const [estimatedBytes, setEstimatedBytes] = useState(0);
   const [storageMetrics, setStorageMetrics] = useState<{
     appBytes: number;
@@ -96,6 +97,15 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       setOpen(true);
     }
   }, [compact, loading, status]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const ua = navigator.userAgent || "";
+    const platform = navigator.platform || "";
+    const maxTouchPoints = navigator.maxTouchPoints || 0;
+    const isIOS = /iPad|iPhone|iPod/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
+    if (isIOS) setPreferNativeFileInput(true);
+  }, []);
 
   useEffect(() => {
     try {
@@ -270,7 +280,14 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
 
     setLoading("import-local");
     try {
-      const raw = await file.text();
+      const raw = await (typeof file.text === "function"
+        ? file.text()
+        : new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result ?? ""));
+            reader.onerror = () => reject(new Error("读取本地文件失败，请重试"));
+            reader.readAsText(file, "utf-8");
+          }));
       const parsed = JSON.parse(raw) as unknown;
       if (!isBackupPayload(parsed)) {
         throw new Error("本地文件格式不受支持，请选择由系统导出的备份 JSON");
@@ -520,13 +537,29 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
         </div>
       )}
 
-      <input
-        ref={localImportInputRef}
-        type="file"
-        accept=".json,application/json,text/json,text/plain"
-        className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
-        onChange={handleLocalImportFile}
-      />
+      {preferNativeFileInput && (
+        <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/70 p-2">
+          <p className="mb-1 text-[0.64rem] text-blue-700 break-words">iPad 建议直接使用下方文件选择器导入本地备份</p>
+          <input
+            ref={localImportInputRef}
+            type="file"
+            accept=".json,application/json,text/json,text/plain,*/*"
+            disabled={loading !== null}
+            onChange={handleLocalImportFile}
+            className="block w-full rounded-md border border-blue-200 bg-white px-2 py-1.5 text-[0.72rem] text-gray-700 file:mr-2 file:rounded-md file:border-0 file:bg-blue-100 file:px-2 file:py-1 file:text-[0.7rem] file:font-medium file:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </div>
+      )}
+
+      {!preferNativeFileInput && (
+        <input
+          ref={localImportInputRef}
+          type="file"
+          accept=".json,application/json,text/json,text/plain,*/*"
+          className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
+          onChange={handleLocalImportFile}
+        />
+      )}
     </div>
   );
 
