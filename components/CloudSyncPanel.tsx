@@ -6,9 +6,11 @@ import { SafeTextButton } from "./SafeTextButton";
 import {
   buildBackupPayload,
   flushPendingStorageWrites,
+  getStorageBackendInfo,
   restoreFromBackupPayload,
   type BackupPayload,
   type RestoreMode,
+  type StorageBackend,
 } from "../lib/db";
 import {
   downloadBackupJson,
@@ -54,6 +56,8 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
   const [open, setOpen] = useState(!compact);
   const [preferNativeFileInput, setPreferNativeFileInput] = useState(false);
   const [estimatedBytes, setEstimatedBytes] = useState(0);
+  const [storageBackend, setStorageBackend] = useState<StorageBackend>("localStorage");
+  const [storageBackendBytes, setStorageBackendBytes] = useState<number>(0);
   const [storageMetrics, setStorageMetrics] = useState<{
     appBytes: number;
     usageBytes: number | null;
@@ -168,6 +172,7 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
     let cancelled = false;
 
     const calcStorageMetrics = async () => {
+      const backendInfo = getStorageBackendInfo();
       let appBytes = 0;
       try {
         for (let i = 0; i < window.localStorage.length; i++) {
@@ -195,6 +200,8 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       }
 
       if (cancelled) return;
+      setStorageBackend(backendInfo.backend);
+      setStorageBackendBytes(backendInfo.approxBytes);
       setStorageMetrics({ appBytes, usageBytes, quotaBytes });
     };
 
@@ -436,6 +443,10 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       <p className="mt-1 text-[0.64rem] text-gray-400 break-all">Scope: {getDriveScope()}</p>
       <p className="mt-1 text-[0.64rem] text-gray-400 break-words">目录: {getBackupFolderName()}</p>
       <p className="mt-1 text-[0.64rem] text-gray-400 break-words">预计大小: {formatBytes(estimatedBytes)}</p>
+      <p className="mt-1 text-[0.64rem] text-gray-400 break-words">
+        当前存储: {storageBackend === "indexedDB" ? "IndexedDB（大容量完整模式）" : "localStorage"}
+        {storageBackendBytes > 0 ? ` · ${formatBytes(storageBackendBytes)}` : ""}
+      </p>
       <p className="mt-1 text-[0.64rem] text-gray-400 break-words">
         本地占用: {formatBytes(storageMetrics.appBytes)}
         {storageUsageRatio != null

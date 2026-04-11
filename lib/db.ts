@@ -18,7 +18,7 @@ const IDB_NAME = "study-app-storage";
 const IDB_STORE = "app-state";
 const IDB_RECORD_KEY = "primary-db";
 
-type StorageBackend = "localStorage" | "indexedDB";
+export type StorageBackend = "localStorage" | "indexedDB";
 
 type StorageBackendMeta = {
   backend: StorageBackend;
@@ -65,6 +65,32 @@ function readStorageBackendMeta(): StorageBackendMeta | null {
 function writeStorageBackendMeta(meta: StorageBackendMeta) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_BACKEND_KEY, JSON.stringify(meta));
+}
+
+export function getStorageBackendInfo(): {
+  backend: StorageBackend;
+  approxBytes: number;
+  updatedAt: number | null;
+} {
+  if (typeof window === "undefined") {
+    return { backend: "localStorage", approxBytes: 0, updatedAt: null };
+  }
+
+  const meta = readStorageBackendMeta();
+  if (meta) {
+    return {
+      backend: meta.backend,
+      approxBytes: meta.approxBytes,
+      updatedAt: meta.updatedAt,
+    };
+  }
+
+  const { raw } = readRawLocalSnapshot();
+  return {
+    backend: "localStorage",
+    approxBytes: raw ? new Blob([raw]).size : 0,
+    updatedAt: null,
+  };
 }
 
 function openStorageDatabase(): Promise<IDBDatabase> {
