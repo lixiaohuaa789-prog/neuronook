@@ -455,16 +455,68 @@ function mergeDB(base: StudyDB, incoming: StudyDB): StudyDB {
   };
 }
 
+function isInlineDataImage(value: string): boolean {
+  return /^data:image\//i.test(value.trim());
+}
+
+function stripInlineImagesForQuota(db: StudyDB): {
+  compacted: StudyDB;
+  strippedImages: number;
+  strippedMemoryBubbleImages: number;
+} {
+  const compacted = JSON.parse(JSON.stringify(db)) as StudyDB;
+  let strippedImages = 0;
+  let strippedMemoryBubbleImages = 0;
+
+  for (const note of compacted.notes) {
+    if (Array.isArray(note.images) && note.images.length > 0) {
+      const kept = note.images.filter((img) => !isInlineDataImage(img));
+      strippedImages += note.images.length - kept.length;
+      note.images = kept.length > 0 ? kept : undefined;
+    }
+
+    if (Array.isArray(note.memoryBubbleImages) && note.memoryBubbleImages.length > 0) {
+      const kept = note.memoryBubbleImages.filter((img) => !isInlineDataImage(img));
+      strippedMemoryBubbleImages += note.memoryBubbleImages.length - kept.length;
+      note.memoryBubbleImages = kept.length > 0 ? kept : undefined;
+    }
+  }
+
+  return { compacted, strippedImages, strippedMemoryBubbleImages };
+}
+
 export function restoreFromBackupPayload(payload: BackupPayload, mode: RestoreMode = "overwrite") {
   const incoming = migrateParsed(payload.db);
   const current = getDB() ?? emptyDB();
   const next = mode === "overwrite" ? incoming : mergeDB(current, incoming);
-  saveDB(next);
+
+  let strippedImages = 0;
+  let strippedMemoryBubbleImages = 0;
+  try {
+    saveDB(next);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const isQuotaError = message.includes("本地存储空间已满");
+    if (!isQuotaError) throw error;
+
+    const compactResult = stripInlineImagesForQuota(next);
+    strippedImages = compactResult.strippedImages;
+    strippedMemoryBubbleImages = compactResult.strippedMemoryBubbleImages;
+
+    // If no inline image can be stripped, keep the original quota error.
+    if (strippedImages + strippedMemoryBubbleImages <= 0) {
+      throw error;
+    }
+
+    saveDB(compactResult.compacted);
+  }
 
   return {
     notes: next.notes.length,
     reviews: next.reviews.length,
     checkins: next.checkins.length,
+    strippedImages,
+    strippedMemoryBubbleImages,
   };
 }
 

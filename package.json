@@ -1,6 +1,6 @@
 {
   "name": "study-app",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "知识点笔记本 · 间隔复习（考试脑科学节奏）· 番茄钟",
   "engines": {
