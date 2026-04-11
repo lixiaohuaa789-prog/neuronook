@@ -553,6 +553,12 @@ function ReviewPageContent() {
             : allFrameworkItems)
       : getReviewQueue();
     setItems(nextItems);
+    setForecast(getReviewForecast());
+    setTodayStats(getTodayReviewStats());
+    const allFolders = getAllFolders();
+    setFolders(allFolders);
+    const folder = allFolders.find((f) => f.id === folderId) ?? null;
+    setNodeStatusMap(getNodeStatusMap(folder));
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.scrollTo({ top: currentScrollY, behavior: "auto" });
@@ -588,6 +594,12 @@ function ReviewPageContent() {
               : allFrameworkItems)
         : getReviewQueue();
       setItems(nextItems);
+      setForecast(getReviewForecast());
+      setTodayStats(getTodayReviewStats());
+      const allFolders = getAllFolders();
+      setFolders(allFolders);
+      const folder = allFolders.find((f) => f.id === folderId) ?? null;
+      setNodeStatusMap(getNodeStatusMap(folder));
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           window.scrollTo({ top: currentScrollY, behavior: "auto" });
@@ -1249,10 +1261,10 @@ function ReviewPageContent() {
             <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>
-                  今日完成度
+                  今日已记住完成度
                 </span>
                 <span className="text-xs font-semibold" style={{ color: "var(--accent)" }}>
-                  {Math.round((todayStats.processed / todayStats.total) * 100)}%
+                  {Math.round((todayStats.remembered / todayStats.total) * 100)}%
                 </span>
               </div>
               <div
@@ -1265,13 +1277,13 @@ function ReviewPageContent() {
                 <div
                   className="h-full transition-all duration-300"
                   style={{
-                    width: `${todayStats.processed > 0 ? Math.max((todayStats.processed / todayStats.total) * 100, 4) : 0}%`,
+                    width: `${todayStats.remembered > 0 ? Math.max((todayStats.remembered / todayStats.total) * 100, 4) : 0}%`,
                     background: "linear-gradient(90deg, var(--accent), var(--success))",
                   }}
                 />
               </div>
               <div className="mt-1 text-[11px]" style={{ color: "var(--muted)" }}>
-                已完成 {todayStats.processed} / {todayStats.total}
+                已记住 {todayStats.remembered} / {todayStats.total}（已处理 {todayStats.processed}）
               </div>
             </div>
           )}
