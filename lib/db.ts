@@ -106,6 +106,12 @@ export type NewNoteInput = Omit<
   "id" | "created_at" | "status" | "step" | "nextReviewTime" | "updatedAt"
 >;
 
+export type BatchProgress = {
+  phase: "processing" | "saving";
+  processed: number;
+  total: number;
+};
+
 export type BackupPayload = {
   version: 1 | 2;
   exportedAt: string;
@@ -513,6 +519,80 @@ export function addNote(note: NewNoteInput): Note {
   return full;
 }
 
+export async function addNotesBatch(
+  notes: NewNoteInput[],
+  options?: {
+    chunkSize?: number;
+    onProgress?: (progress: BatchProgress) => void;
+  }
+): Promise<Note[]> {
+  if (!notes || notes.length === 0) return [];
+
+  const db = getDB();
+  if (!db) return [];
+
+  const total = notes.length;
+  const chunkSize = Math.max(1, options?.chunkSize ?? 30);
+  const report = (phase: BatchProgress["phase"], processed: number) => {
+    options?.onProgress?.({ phase, processed, total });
+  };
+  const yieldMainThread = async () => {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+  };
+
+  report("processing", 0);
+
+  const existingIds = new Set(db.notes.map((n) => n.id));
+  let nextId = Date.now();
+  const created: Note[] = [];
+
+  for (let index = 0; index < notes.length; index++) {
+    const note = notes[index];
+    while (existingIds.has(nextId)) {
+      nextId += 1;
+    }
+
+    const nowMs = Date.now();
+    const full: Note = {
+      ...note,
+      id: nextId,
+      created_at: new Date(nowMs).toISOString(),
+      updatedAt: nowMs,
+      status: "learning",
+      step: 0,
+      nextReviewTime: nowMs,
+    };
+
+    const review: Review = {
+      note_id: full.id,
+      status: "learning",
+      step: 0,
+      nextReviewTime: nowMs,
+      srsStep: 1,
+      next_review: null,
+    };
+    syncLegacyReviewFields(review);
+
+    db.notes.push(full);
+    db.reviews.push(review);
+    created.push(full);
+    existingIds.add(full.id);
+    nextId += 1;
+
+    const processed = index + 1;
+    if (processed % chunkSize === 0 || processed === total) {
+      report("processing", processed);
+      await yieldMainThread();
+    }
+  }
+
+  report("saving", total);
+  await yieldMainThread();
+  saveDB(db);
+  report("saving", total);
+  return created;
+}
+
 export function getTodayReviews(): Review[] {
   const db = getDB();
   if (!db) return [];
@@ -742,6 +822,58 @@ export function deleteNote(noteId: number) {
   pushTombstone(db, "note", String(noteId));
   
   saveDB(db);
+}
+
+export async function deleteNotesBatch(
+  noteIds: number[],
+  options?: {
+    chunkSize?: number;
+    onProgress?: (progress: BatchProgress) => void;
+  }
+): Promise<number> {
+  if (!noteIds || noteIds.length === 0) return 0;
+
+  const db = getDB();
+  if (!db) return 0;
+
+  const uniqueIds = Array.from(new Set(noteIds));
+  const total = uniqueIds.length;
+  const chunkSize = Math.max(1, options?.chunkSize ?? 40);
+  const report = (phase: BatchProgress["phase"], processed: number) => {
+    options?.onProgress?.({ phase, processed, total });
+  };
+  const yieldMainThread = async () => {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+  };
+
+  report("processing", 0);
+
+  const idSet = new Set(uniqueIds);
+  const beforeCount = db.notes.length;
+
+  db.notes = db.notes.filter((n) => !idSet.has(n.id));
+  db.reviews = db.reviews.filter((r) => !idSet.has(r.note_id));
+  db.reviewLogs = db.reviewLogs.filter((l) => !idSet.has(l.note_id));
+
+  for (let index = 0; index < uniqueIds.length; index++) {
+    const noteId = uniqueIds[index];
+    pushTombstone(db, "note", String(noteId));
+
+    const processed = index + 1;
+    if (processed % chunkSize === 0 || processed === total) {
+      report("processing", processed);
+      await yieldMainThread();
+    }
+  }
+
+  const removed = Math.max(0, beforeCount - db.notes.length);
+  if (removed === 0) return 0;
+
+  report("saving", total);
+  await yieldMainThread();
+  saveDB(db);
+  report("saving", total);
+  return removed;
 }
 
 export function updateNote(noteId: number, data: NewNoteInput): Note | null {
@@ -1090,6 +1222,43 @@ export function linkNodeToNote(folderId: string, nodeId: string, noteId: number)
   folder.updatedAt = Date.now();
   saveDB(db);
   return true;
+}
+
+export function linkNodeToNotes(folderId: string, nodeId: string, noteIds: number[]): number {
+  if (!noteIds || noteIds.length === 0) return 0;
+
+  const db = getDB();
+  if (!db) return 0;
+  const folder = db.folders.find((f) => f.id === folderId);
+  if (!folder) return 0;
+
+  const uniqueNoteIds = new Set(noteIds);
+  let linkedCount = 0;
+  let changed = false;
+
+  folder.nodes = mapFolderNodes(folder.nodes, (node) => {
+    if (node.id !== nodeId) return node;
+
+    const existing = new Set(node.linkedNoteIds);
+    for (const id of uniqueNoteIds) {
+      if (!existing.has(id)) {
+        existing.add(id);
+        linkedCount += 1;
+      }
+    }
+
+    if (linkedCount === 0) return node;
+    changed = true;
+    return {
+      ...node,
+      linkedNoteIds: Array.from(existing),
+    };
+  });
+
+  if (!changed) return 0;
+  folder.updatedAt = Date.now();
+  saveDB(db);
+  return linkedCount;
 }
 
 export type FrameworkReviewItem = ReviewQueueItem & {

@@ -243,7 +243,23 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
 
   const handleLocalImportClick = () => {
     if (loading) return;
-    localImportInputRef.current?.click();
+    const input = localImportInputRef.current;
+    if (!input) return;
+
+    // Reset value first so selecting the same file still fires change.
+    input.value = "";
+
+    const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
+    if (typeof pickerInput.showPicker === "function") {
+      try {
+        pickerInput.showPicker();
+        return;
+      } catch {
+        // Fallback to click for browsers that block showPicker.
+      }
+    }
+
+    input.click();
   };
 
   const handleLocalImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -507,8 +523,8 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       <input
         ref={localImportInputRef}
         type="file"
-        accept="application/json,.json"
-        className="hidden"
+        accept=".json,application/json,text/json,text/plain"
+        className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
         onChange={handleLocalImportFile}
       />
     </div>

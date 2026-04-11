@@ -3,12 +3,16 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
-import { addNote, getAllFolders, getAllNotes, deleteNote, linkNodeToNote, toggleNodeNoteLink, updateNote, type FolderNode, type FolderTree, type NewNoteInput, type Note } from "@/lib/db";
+import { addNote, addNotesBatch, getAllFolders, getAllNotes, deleteNote, deleteNotesBatch, linkNodeToNote, linkNodeToNotes, toggleNodeNoteLink, updateNote, type BatchProgress, type FolderNode, type FolderTree, type NewNoteInput, type Note } from "@/lib/db";
 import { NotebookEditor } from "@/components/NotebookEditor";
 import { NoteCard } from "@/components/NoteCard";
 import { FormulaText } from "@/components/FormulaText";
 
 const NOTES_BATCH_SIZE = 24;
+
+type BulkActionProgress = BatchProgress & {
+  action: "import" | "delete";
+};
 
 type NodeOption = {
   id: string;
@@ -108,6 +112,7 @@ function NotesPageContent() {
   const [groupVisibleCounts, setGroupVisibleCounts] = useState<Record<string, number>>({});
   const [listReady, setListReady] = useState(false);
   const [lastBatchImportedIds, setLastBatchImportedIds] = useState<number[]>([]);
+  const [bulkProgress, setBulkProgress] = useState<BulkActionProgress | null>(null);
   const editingPanelRef = useRef<HTMLDivElement | null>(null);
   const listSectionRef = useRef<HTMLDivElement | null>(null);
   const shouldScrollToListRef = useRef(false);
@@ -348,20 +353,21 @@ function NotesPageContent() {
     }
   };
 
-  const handleBatchImportNotes = (items: NewNoteInput[]) => {
+  const handleBatchImportNotes = async (items: NewNoteInput[]) => {
     if (!items || items.length === 0) return;
 
     try {
-      const created = items.map((item) => addNote(item));
+      setBulkProgress({ action: "import", phase: "processing", processed: 0, total: items.length });
+
+      const created = await addNotesBatch(items, {
+        onProgress: (progress) => {
+          setBulkProgress({ ...progress, action: "import" });
+        },
+      });
       setLastBatchImportedIds(created.map((note) => note.id));
 
       if (selectedFolderId && selectedNodeId) {
-        let linkedCount = 0;
-        for (const note of created) {
-          if (linkNodeToNote(selectedFolderId, selectedNodeId, note.id)) {
-            linkedCount += 1;
-          }
-        }
+        const linkedCount = linkNodeToNotes(selectedFolderId, selectedNodeId, created.map((note) => note.id));
         setToast(`✅ 批量导入 ${created.length} 条，关联成功 ${linkedCount} 条`);
       } else {
         setToast(`✅ 已批量导入 ${created.length} 条知识点`);
@@ -373,27 +379,26 @@ function NotesPageContent() {
     } catch (error) {
       console.error("[notes] batch import failed", error);
       setToast("❌ 批量导入失败：请检查模板格式后重试");
+    } finally {
+      setBulkProgress(null);
     }
   };
 
-  const handleUndoBatchImport = () => {
+  const handleUndoBatchImport = async () => {
     if (lastBatchImportedIds.length === 0) return;
+    if (bulkProgress) return;
 
     const shouldUndo = confirm(`确定要撤销最近一次批量导入吗？\n将删除 ${lastBatchImportedIds.length} 条知识点。`);
     if (!shouldUndo) return;
 
     try {
-      const before = getAllNotes();
-      const batchSet = new Set(lastBatchImportedIds);
-      const existingBefore = before.filter((n) => batchSet.has(n.id)).length;
-
-      for (const noteId of lastBatchImportedIds) {
-        deleteNote(noteId);
-      }
-
+      setBulkProgress({ action: "delete", phase: "processing", processed: 0, total: lastBatchImportedIds.length });
+      const removedCount = await deleteNotesBatch(lastBatchImportedIds, {
+        onProgress: (progress) => {
+          setBulkProgress({ ...progress, action: "delete" });
+        },
+      });
       const after = getAllNotes();
-      const existingAfter = after.filter((n) => batchSet.has(n.id)).length;
-      const removedCount = Math.max(0, existingBefore - existingAfter);
 
       setLastBatchImportedIds([]);
       setNotes(after);
@@ -402,6 +407,8 @@ function NotesPageContent() {
     } catch (error) {
       console.error("[notes] undo batch import failed", error);
       setToast("❌ 撤销失败：请稍后重试");
+    } finally {
+      setBulkProgress(null);
     }
   };
 
@@ -454,7 +461,9 @@ function NotesPageContent() {
     setSelectedNoteIds(new Set());
   };
 
-  const handleBatchDelete = () => {
+  const handleBatchDelete = async () => {
+    if (bulkProgress) return;
+
     const targetIds = filteredNoteIds.filter((id) => selectedNoteIds.has(id));
     if (targetIds.length === 0) {
       setToast("⚠️ 请先勾选要删除的知识点");
@@ -464,26 +473,36 @@ function NotesPageContent() {
     const shouldDelete = confirm(`确定要批量删除 ${targetIds.length} 条知识点吗？此操作无法撤销。`);
     if (!shouldDelete) return;
 
-    for (const noteId of targetIds) {
-      deleteNote(noteId);
-    }
+    try {
+      setBulkProgress({ action: "delete", phase: "processing", processed: 0, total: targetIds.length });
+      const removedCount = await deleteNotesBatch(targetIds, {
+        onProgress: (progress) => {
+          setBulkProgress({ ...progress, action: "delete" });
+        },
+      });
 
-    if (editingNoteId && targetIds.includes(editingNoteId)) {
-      setEditingNoteId(null);
-    }
-    if (expandedNote && targetIds.includes(expandedNote)) {
-      setExpandedNote(null);
-    }
+      if (editingNoteId && targetIds.includes(editingNoteId)) {
+        setEditingNoteId(null);
+      }
+      if (expandedNote && targetIds.includes(expandedNote)) {
+        setExpandedNote(null);
+      }
 
-    setSelectedNoteIds((prev) => {
-      const next = new Set(prev);
-      targetIds.forEach((id) => next.delete(id));
-      return next;
-    });
-    setBatchDeleteMode(false);
-    setNotes(getAllNotes());
-    setFolders(getAllFolders());
-    setToast(`🗑️ 已批量删除 ${targetIds.length} 条`);
+      setSelectedNoteIds((prev) => {
+        const next = new Set(prev);
+        targetIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      setBatchDeleteMode(false);
+      setNotes(getAllNotes());
+      setFolders(getAllFolders());
+      setToast(`🗑️ 已批量删除 ${removedCount} 条`);
+    } catch (error) {
+      console.error("[notes] batch delete failed", error);
+      setToast("❌ 批量删除失败：请稍后重试");
+    } finally {
+      setBulkProgress(null);
+    }
   };
 
   const editingNote = useMemo(
@@ -693,6 +712,34 @@ function NotesPageContent() {
       </div>
 
       {/* Main Editor Card */}
+      {bulkProgress && (
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <div className="mb-2 flex items-center justify-between text-xs text-blue-800">
+            <span>
+              {bulkProgress.action === "import" ? "批量创建" : "批量删除"}
+              {bulkProgress.phase === "saving" ? "：正在写入存储..." : "：正在处理..."}
+            </span>
+            <span>
+              {bulkProgress.processed}/{bulkProgress.total}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
+            <div
+              className="h-full bg-blue-500 transition-all duration-150"
+              style={{
+                width: `${Math.max(
+                  4,
+                  bulkProgress.total > 0
+                    ? (bulkProgress.processed / bulkProgress.total) * 100
+                    : 0
+                )}%`,
+              }}
+              aria-hidden
+            />
+          </div>
+        </div>
+      )}
+
       {lastBatchImportedIds.length > 0 && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-amber-800">
@@ -701,7 +748,8 @@ function NotesPageContent() {
           <button
             type="button"
             onClick={handleUndoBatchImport}
-            className="px-3 py-1.5 text-sm rounded-lg border border-amber-400 bg-white text-amber-800 hover:bg-amber-100 transition-colors"
+            disabled={!!bulkProgress}
+            className="px-3 py-1.5 text-sm rounded-lg border border-amber-400 bg-white text-amber-800 hover:bg-amber-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             ↩️ 撤销本次导入
           </button>
@@ -882,7 +930,7 @@ function NotesPageContent() {
               <button
                 type="button"
                 onClick={handleBatchDelete}
-                disabled={selectedFilteredCount === 0}
+                disabled={selectedFilteredCount === 0 || !!bulkProgress}
                 className="px-2.5 py-1.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 确认删除（{selectedFilteredCount}）

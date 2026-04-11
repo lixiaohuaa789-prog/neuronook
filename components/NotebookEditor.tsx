@@ -9,7 +9,7 @@ import { isCloudinaryConfigured, uploadImageToCloudinary } from "@/lib/image-hos
 export interface NotebookEditorProps {
   initialData?: NewNoteInput;
   onSubmit: (data: NewNoteInput) => void | boolean | Promise<void | boolean>;
-  onBatchImport?: (items: NewNoteInput[]) => void;
+  onBatchImport?: (items: NewNoteInput[]) => void | Promise<void>;
   onCancel?: () => void;
   submitLabel?: string;
   showClearButton?: boolean;
@@ -411,6 +411,7 @@ export function NotebookEditor({
   const [showImportPanel, setShowImportPanel] = useState(false);
   const [importText, setImportText] = useState("");
   const [pendingImportItems, setPendingImportItems] = useState<FlashcardImportResult[]>([]);
+  const [isBatchCreating, setIsBatchCreating] = useState(false);
 
   const removeHistorySubject = (subjectToRemove: string) => {
     const updated = historySubjects.filter((s) => s !== subjectToRemove);
@@ -728,33 +729,43 @@ export function NotebookEditor({
     alert("已导入第 1 条到表单，请检查后再保存。");
   };
 
-  const handleCreateAllPendingImports = () => {
-    if (!onBatchImport || pendingImportItems.length === 0) return;
+  const handleCreateAllPendingImports = async () => {
+    if (!onBatchImport || pendingImportItems.length === 0 || isBatchCreating) return;
 
-    const inputs: NewNoteInput[] = pendingImportItems.map((parsed) => {
-      const finalQuestion = parsed.question.trim();
-      const finalCoreAnswer = parsed.coreAnswer.trim();
-      return {
-        front: finalQuestion || "未命名",
-        content: finalCoreAnswer,
-        subject: subject.trim() || "未分类",
-        difficulty,
-        question: finalQuestion || undefined,
-        coreAnswer: finalCoreAnswer || undefined,
-        keyPoints: parsed.keyPoints.length > 0 ? parsed.keyPoints : undefined,
-        commonMistakes: parsed.commonMistakes.trim() || undefined,
-        examples: parsed.examples.trim() || undefined,
-        images: undefined,
-      };
-    });
+    setIsBatchCreating(true);
 
-    onBatchImport(inputs);
-    setPendingImportItems([]);
-    setShowImportPanel(false);
-    setImportText("");
-    setSubmitState("saved");
-    if (submitResetTimerRef.current) window.clearTimeout(submitResetTimerRef.current);
-    submitResetTimerRef.current = window.setTimeout(() => setSubmitState("idle"), 1200);
+    try {
+      const inputs: NewNoteInput[] = pendingImportItems.map((parsed) => {
+        const finalQuestion = parsed.question.trim();
+        const finalCoreAnswer = parsed.coreAnswer.trim();
+        return {
+          front: finalQuestion || "未命名",
+          content: finalCoreAnswer,
+          subject: subject.trim() || "未分类",
+          difficulty,
+          question: finalQuestion || undefined,
+          coreAnswer: finalCoreAnswer || undefined,
+          keyPoints: parsed.keyPoints.length > 0 ? parsed.keyPoints : undefined,
+          commonMistakes: parsed.commonMistakes.trim() || undefined,
+          examples: parsed.examples.trim() || undefined,
+          images: undefined,
+        };
+      });
+
+      await onBatchImport(inputs);
+      setPendingImportItems([]);
+      setShowImportPanel(false);
+      setImportText("");
+      setSubmitState("saved");
+      if (submitResetTimerRef.current) window.clearTimeout(submitResetTimerRef.current);
+      submitResetTimerRef.current = window.setTimeout(() => setSubmitState("idle"), 1200);
+    } catch (error) {
+      console.error("[NotebookEditor] batch import failed", error);
+      const msg = error instanceof Error ? error.message : "批量创建失败，请稍后重试";
+      alert(msg);
+    } finally {
+      setIsBatchCreating(false);
+    }
   };
 
   return (
@@ -857,9 +868,10 @@ export function NotebookEditor({
                         <button
                           type="button"
                           onClick={handleCreateAllPendingImports}
+                          disabled={isBatchCreating}
                           className="px-3 py-1.5 text-xs rounded-lg border border-amber-400 bg-white text-amber-800 hover:bg-amber-100"
                         >
-                          批量创建全部
+                          {isBatchCreating ? "创建中..." : "批量创建全部"}
                         </button>
                       )}
                       <button
