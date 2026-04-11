@@ -1800,7 +1800,7 @@ function ReviewPageContent() {
                                 <button
                                   type="button"
                                   onClick={() => removeImageBubble(src)}
-                                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] leading-none shadow"
+                                  className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] leading-none shadow"
                                   aria-label="删除图片"
                                 >
                                   ×
