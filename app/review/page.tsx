@@ -23,6 +23,7 @@ import {
 } from "../../lib/db";
 import { getSubjectTheme } from "../../lib/subjectTheme";
 import { formatNextReviewHint, srsStepHint, srsStepLabel } from "../../lib/srs";
+import { uploadImageToCloudinary, compressImageFile } from "../../lib/image-host";
 
 const REVIEW_BATCH_SIZE = 20;
 const WENKAI_CONTENT_FONT = '"LXGW WenKai Screen", "LXGW WenKai", "Kaiti SC", "STKaiti", "Noto Serif SC", serif';
@@ -432,6 +433,9 @@ function ReviewPageContent() {
   const [highPriorityOnly, setHighPriorityOnly] = useState(false);
   const [keywordsByNoteId, setKeywordsByNoteId] = useState<Record<number, string[]>>({});
   const [keywordDraft, setKeywordDraft] = useState("");
+  const [imageBubbleDraft, setImageBubbleDraft] = useState("");
+  const [showImageBubbleInput, setShowImageBubbleInput] = useState(false);
+  const [imageBubbleUploading, setImageBubbleUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const prevRecallNoteIdRef = useRef<number | null>(null);
   const recallContentRef = useRef<HTMLDivElement | null>(null);
@@ -681,7 +685,8 @@ function ReviewPageContent() {
       (note.keyPoints && note.keyPoints.length > 0) ||
       note.commonMistakes ||
       note.examples ||
-      (note.images && note.images.length > 0)
+      (note.images && note.images.length > 0) ||
+      (note.memoryBubbleImages && note.memoryBubbleImages.length > 0)
     );
   };
 
@@ -712,6 +717,8 @@ function ReviewPageContent() {
     // 保存后仅更新 recallItem 引用（同一张卡）不应关闭编辑器
     if (currId !== prevId) {
       setKeywordDraft("");
+      setImageBubbleDraft("");
+      setShowImageBubbleInput(false);
       setIsEditing(false);
     }
 
@@ -777,6 +784,90 @@ function ReviewPageContent() {
     setItems((prev) => prev.map((item) => (item.note.id === updated.id ? { ...item, note: updated } : item)));
     setRecallItem((prev) => (prev ? { ...prev, note: updated } : prev));
     setKeywordsByNoteId((prev) => ({ ...prev, [updated.id]: updated.keywords ?? [] }));
+  };
+
+  const handleImageFilePaste = async (file: File) => {
+    if (!recallItem) return;
+    setImageBubbleUploading(true);
+    try {
+      const cloudUrl = await uploadImageToCloudinary(file);
+      if (cloudUrl) { addImageBubble(cloudUrl); return; }
+      const blob = await compressImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => { const url = ev.target?.result as string; if (url) addImageBubble(url); };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.error("[review] image paste failed", err);
+    } finally {
+      setImageBubbleUploading(false);
+    }
+  };
+
+  const addImageBubble = (src: string) => {
+    if (!recallItem) return;
+    const value = src.trim();
+    if (!value) return;
+    const currentBubbleImages = recallItem.note.memoryBubbleImages ?? [];
+    if (currentBubbleImages.includes(value)) return;
+    const nextBubbleImages = [...currentBubbleImages, value];
+    const currentImages = recallItem.note.images ?? [];
+    const nextImages = currentImages.includes(value) ? currentImages : [...currentImages, value];
+    let updated: ReturnType<typeof updateNote> = null;
+    try {
+      updated = updateNote(recallItem.note.id, {
+        front: recallItem.note.front,
+        question: recallItem.note.question,
+        subject: recallItem.note.subject,
+        difficulty: recallItem.note.difficulty,
+        content: recallItem.note.coreAnswer ?? recallItem.note.content,
+        coreAnswer: recallItem.note.coreAnswer ?? recallItem.note.content,
+        keyPoints: recallItem.note.keyPoints ?? [],
+        keywords: keywordsByNoteId[recallItem.note.id] ?? recallItem.note.keywords ?? [],
+        examples: recallItem.note.examples,
+        commonMistakes: recallItem.note.commonMistakes,
+        images: nextImages,
+        memoryBubbleImages: nextBubbleImages,
+      });
+    } catch (error) {
+      console.error("[review] addImageBubble failed", error);
+      setToast("保存图片失败：本地存储空间不足，请删减图片后重试");
+      return;
+    }
+    if (!updated) return;
+    setItems((prev) => prev.map((item) => (item.note.id === updated.id ? { ...item, note: updated } : item)));
+    setRecallItem((prev) => (prev ? { ...prev, note: updated } : prev));
+    setImageBubbleDraft("");
+    setShowImageBubbleInput(false);
+  };
+
+  const removeImageBubble = (src: string) => {
+    if (!recallItem) return;
+    const currentBubbleImages = recallItem.note.memoryBubbleImages ?? [];
+    const nextBubbleImages = currentBubbleImages.filter((img) => img !== src);
+    let updated: ReturnType<typeof updateNote> = null;
+    try {
+      updated = updateNote(recallItem.note.id, {
+        front: recallItem.note.front,
+        question: recallItem.note.question,
+        subject: recallItem.note.subject,
+        difficulty: recallItem.note.difficulty,
+        content: recallItem.note.coreAnswer ?? recallItem.note.content,
+        coreAnswer: recallItem.note.coreAnswer ?? recallItem.note.content,
+        keyPoints: recallItem.note.keyPoints ?? [],
+        keywords: keywordsByNoteId[recallItem.note.id] ?? recallItem.note.keywords ?? [],
+        examples: recallItem.note.examples,
+        commonMistakes: recallItem.note.commonMistakes,
+        images: recallItem.note.images,
+        memoryBubbleImages: nextBubbleImages,
+      });
+    } catch (error) {
+      console.error("[review] removeImageBubble failed", error);
+      setToast("删除图片失败：请稍后重试");
+      return;
+    }
+    if (!updated) return;
+    setItems((prev) => prev.map((item) => (item.note.id === updated.id ? { ...item, note: updated } : item)));
+    setRecallItem((prev) => (prev ? { ...prev, note: updated } : prev));
   };
 
   const saveInlineEdit = (data: Parameters<typeof updateNote>[1]): boolean => {
@@ -1583,7 +1674,7 @@ function ReviewPageContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setRecallItem(null)}>
           <div className="absolute inset-0 bg-black/35" aria-hidden />
           <div
-            className="relative w-full max-w-3xl rounded-2xl bg-[var(--surface)] text-[var(--text)] shadow-[0_18px_50px_rgba(15,23,42,0.22)]"
+            className="relative w-full max-w-3xl rounded-2xl border border-[#8DA146] bg-[var(--surface)] text-[var(--text)] shadow-[0_18px_50px_rgba(15,23,42,0.22)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-6 py-4">
@@ -1656,7 +1747,7 @@ function ReviewPageContent() {
                   <section className="grid grid-cols-[minmax(130px,34%)_1fr] items-start gap-4 md:gap-6">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold tracking-widest text-[var(--muted)] uppercase mb-2">记忆泡泡</p>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 overflow-y-auto max-h-80 pr-1">
                         {recallAnswerLayout.hasFocus && (
                           <span
                             className="inline-flex items-center gap-2 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-1.5 text-sm font-semibold font-serif leading-relaxed tracking-wide text-[var(--text)] shadow-[0_8px_24px_rgb(0,0,0,0.06)] backdrop-blur-sm"
@@ -1676,6 +1767,85 @@ function ReviewPageContent() {
                           placeholder="+ 提取关键词..."
                           fontFamily={WENKAI_CONTENT_FONT}
                         />
+                        {/* Image bubbles */}
+                        {(recallItem.note.memoryBubbleImages ?? []).filter(Boolean).length > 0 && (
+                          <div className="flex flex-col gap-2.5">
+                            {(recallItem.note.memoryBubbleImages ?? []).filter(Boolean).map((src, idx) => (
+                              <div key={`${idx}-${src}`} className="relative group">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewImage(src)}
+                                  className="block w-full max-w-[220px] h-32 overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--surface-2)] hover:brightness-95 transition-all"
+                                  title="点击放大"
+                                >
+                                  <img
+                                    src={src}
+                                    alt={`记忆图片 ${idx + 1}`}
+                                    className="h-full w-full object-contain p-1.5"
+                                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeImageBubble(src)}
+                                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] leading-none shadow"
+                                  aria-label="删除图片"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {showImageBubbleInput ? (
+                          <div className="flex gap-1 mt-0.5">
+                            <input
+                              type="text"
+                              value={imageBubbleUploading ? "" : imageBubbleDraft}
+                              onChange={(e) => setImageBubbleDraft(e.target.value)}
+                              onPaste={(e) => {
+                                const items = Array.from(e.clipboardData.items || []);
+                                const imgItem = items.find((it) => it.type.startsWith("image/"));
+                                if (imgItem) {
+                                  e.preventDefault();
+                                  const file = imgItem.getAsFile();
+                                  if (file) void handleImageFilePaste(file);
+                                }
+                                // text URL paste falls through to onChange
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); addImageBubble(imageBubbleDraft); }
+                                if (e.key === "Escape") { setShowImageBubbleInput(false); setImageBubbleDraft(""); }
+                              }}
+                              placeholder={imageBubbleUploading ? "上传中..." : "粘贴截图或 URL"}
+                              disabled={imageBubbleUploading}
+                              ref={(el) => { if (el) setTimeout(() => el.focus(), 0); }}
+                              className="flex-1 min-w-0 rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] px-2 py-1 text-xs text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-60"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addImageBubble(imageBubbleDraft)}
+                              className="shrink-0 px-2 py-1 text-xs rounded-md border border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--surface-hover)]"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowImageBubbleInput(false); setImageBubbleDraft(""); }}
+                              className="shrink-0 px-2 py-1 text-xs rounded-md border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-hover)]"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowImageBubbleInput(true)}
+                            className="self-start px-2 py-1 text-xs rounded-full border border-dashed border-[var(--border-strong)] text-[var(--muted)] hover:bg-[var(--surface-2)] transition-colors"
+                          >
+                            + 添加图片
+                          </button>
+                        )}
                       </div>
                     </div>
 

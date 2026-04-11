@@ -52,6 +52,11 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
   const [restoreMode, setRestoreMode] = useState<RestoreMode>("overwrite");
   const [open, setOpen] = useState(!compact);
   const [estimatedBytes, setEstimatedBytes] = useState(0);
+  const [storageMetrics, setStorageMetrics] = useState<{
+    appBytes: number;
+    usageBytes: number | null;
+    quotaBytes: number | null;
+  }>({ appBytes: 0, usageBytes: null, quotaBytes: null });
   const localImportInputRef = useRef<HTMLInputElement | null>(null);
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
@@ -148,11 +153,62 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
     return () => window.removeEventListener("study-app-changed", calcEstimate);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const calcStorageMetrics = async () => {
+      let appBytes = 0;
+      try {
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (!key) continue;
+          if (!key.startsWith("study_app_data") && key !== GOOGLE_AUTH_STORAGE_KEY) continue;
+          const value = window.localStorage.getItem(key) ?? "";
+          appBytes += new Blob([key, value]).size;
+        }
+      } catch {
+        appBytes = 0;
+      }
+
+      let usageBytes: number | null = null;
+      let quotaBytes: number | null = null;
+      try {
+        if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
+          const estimate = await navigator.storage.estimate();
+          usageBytes = typeof estimate.usage === "number" ? estimate.usage : null;
+          quotaBytes = typeof estimate.quota === "number" ? estimate.quota : null;
+        }
+      } catch {
+        usageBytes = null;
+        quotaBytes = null;
+      }
+
+      if (cancelled) return;
+      setStorageMetrics({ appBytes, usageBytes, quotaBytes });
+    };
+
+    void calcStorageMetrics();
+    window.addEventListener("study-app-changed", calcStorageMetrics);
+    window.addEventListener("storage", calcStorageMetrics);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("study-app-changed", calcStorageMetrics);
+      window.removeEventListener("storage", calcStorageMetrics);
+    };
+  }, []);
+
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
+
+  const storageUsageRatio = useMemo(() => {
+    if (storageMetrics.quotaBytes && storageMetrics.quotaBytes > 0 && storageMetrics.usageBytes != null) {
+      return Math.max(0, Math.min(1, storageMetrics.usageBytes / storageMetrics.quotaBytes));
+    }
+    return null;
+  }, [storageMetrics]);
 
   const buildLocalExportFilename = () => {
     const now = new Date();
@@ -342,6 +398,24 @@ export function CloudSyncPanel({ compact = false }: CloudSyncPanelProps) {
       <p className="mt-1 text-[0.64rem] text-gray-400 break-all">Scope: {getDriveScope()}</p>
       <p className="mt-1 text-[0.64rem] text-gray-400 break-words">目录: {getBackupFolderName()}</p>
       <p className="mt-1 text-[0.64rem] text-gray-400 break-words">预计大小: {formatBytes(estimatedBytes)}</p>
+      <p className="mt-1 text-[0.64rem] text-gray-400 break-words">
+        本地占用: {formatBytes(storageMetrics.appBytes)}
+        {storageUsageRatio != null
+          ? `（总占用 ${(storageUsageRatio * 100).toFixed(1)}%）`
+          : "（总占用未知）"}
+      </p>
+      {storageUsageRatio != null && (
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+          <div
+            className={[
+              "h-full transition-all",
+              storageUsageRatio >= 0.8 ? "bg-rose-500" : storageUsageRatio >= 0.65 ? "bg-amber-500" : "bg-emerald-500",
+            ].join(" ")}
+            style={{ width: `${Math.max(3, storageUsageRatio * 100)}%` }}
+            aria-hidden
+          />
+        </div>
+      )}
       {estimatedBytes > RECOMMENDED_BACKUP_SIZE_BYTES && (
         <p className="mt-1 text-[0.64rem] text-amber-600 break-words">提示: 备份较大，建议压缩图片后再上传</p>
       )}

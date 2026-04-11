@@ -48,6 +48,34 @@ function normalizeBulletLine(line: string): string {
     .trim();
 }
 
+function extractKeyPointsFromLooseText(text: string): string[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const bulletLike = lines.filter((line) =>
+    CIRCLED_NUM_PREFIX.test(line) || /^\d+[.)、]\s+/.test(line) || /^[-*•]\s+/.test(line)
+  );
+
+  if (bulletLike.length > 0) {
+    return bulletLike.map(normalizeBulletLine).filter(Boolean).slice(0, 8);
+  }
+
+  // Fallback: support a single-line key point string separated by full-width semicolons.
+  if (text.includes("；")) {
+    return text
+      .replace(/\r?\n/g, " ")
+      .split("；")
+      .map((part) => cleanMarkdownInline(part))
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+  }
+
+  return [];
+}
+
 function extractFocusBlock(text: string): { focus: string | null; rest: string } {
   if (!text.trim()) return { focus: null, rest: "" };
   const match = text.match(/:::focus[^\n]*\n([\s\S]*?)\n:::\s*/);
@@ -112,6 +140,40 @@ type FlashcardImportResult = {
   examples: string;
 };
 
+function parseBackBlockFields(backText: string): {
+  coreAnswer: string;
+  keyPoints: string[];
+  examples: string;
+  commonMistakes: string;
+} {
+  const text = backText.trim();
+  if (!text) {
+    return { coreAnswer: "", keyPoints: [], examples: "", commonMistakes: "" };
+  }
+
+  const labels = [...text.matchAll(/(?:^|\n)\s*(核心答案|关键点|要点|大白话解释|通俗解释|避坑指南)\s*[：:]\s*/g)];
+  if (labels.length === 0) {
+    return { coreAnswer: text, keyPoints: [], examples: "", commonMistakes: "" };
+  }
+
+  const sections: Record<string, string> = {};
+  for (let i = 0; i < labels.length; i++) {
+    const current = labels[i];
+    const next = labels[i + 1];
+    const label = current[1];
+    const contentStart = (current.index ?? 0) + current[0].length;
+    const contentEnd = next?.index ?? text.length;
+    sections[label] = text.slice(contentStart, contentEnd).trim();
+  }
+
+  return {
+    coreAnswer: sections["核心答案"] || text,
+    keyPoints: extractKeyPointsFromLooseText(sections["关键点"] || sections["要点"] || ""),
+    examples: sections["大白话解释"] || sections["通俗解释"] || "",
+    commonMistakes: sections["避坑指南"] || "",
+  };
+}
+
 const FLASHCARD_FIELD_HEADER = /(^###\s*\d+\.\s*(核心问题|核心答案|关键点|易错点\s*\/\s*常见误区|示例\s*\/\s*应用场景))|(^\*\*题目[：:])|(^###\s*核心解析)|(^【\s*(正面|背面|大白话解释|通俗解释|避坑指南)\s*】)/m;
 
 function stripCodeFence(raw: string): string {
@@ -144,15 +206,14 @@ function parseFlashcardTemplate(raw: string): FlashcardImportResult {
 
     if (Object.keys(bracketSections).length > 0) {
       const question = cleanMarkdownInline(bracketSections["正面"] || "");
-      const coreAnswer = (bracketSections["背面"] || "").trim();
-      const commonMistakes = (bracketSections["避坑指南"] || "").trim();
-      const examples = (bracketSections["大白话解释"] || bracketSections["通俗解释"] || "").trim();
+      const backBlockFields = parseBackBlockFields(bracketSections["背面"] || "");
+      const coreAnswer = backBlockFields.coreAnswer;
+      const commonMistakes = (bracketSections["避坑指南"] || backBlockFields.commonMistakes || "").trim();
+      const examples = (bracketSections["大白话解释"] || bracketSections["通俗解释"] || backBlockFields.examples || "").trim();
 
-      const keyPoints = coreAnswer
-        .split(/\r?\n/)
-        .map(normalizeBulletLine)
-        .filter(Boolean)
-        .slice(0, 8);
+      const keyPoints = backBlockFields.keyPoints.length > 0
+        ? backBlockFields.keyPoints
+        : extractKeyPointsFromLooseText(coreAnswer);
 
       return {
         question,
@@ -1304,7 +1365,7 @@ export function NotebookEditor({
           onClick={() => {
             void handleSubmit();
           }}
-                      disabled={submitState !== "idle" || uploadingCount > 0}
+                      disabled={submitState !== "idle" || uploadingCount > 0 || !coreAnswer.trim()}
           className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg font-medium hover:brightness-105 active:scale-95 transition-all shadow-md disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
         >
                       {uploadingCount > 0

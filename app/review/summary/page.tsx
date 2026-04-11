@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { type ReactNode, Suspense, forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { VirtuosoGrid } from "react-virtuoso";
 import { FormulaText } from "../../../components/FormulaText";
+import { MarkdownMathContent } from "../../../components/MarkdownMathContent";
 import KeywordBubbles from "../../../components/KeywordBubbles";
 import {
   getDB,
@@ -16,6 +17,7 @@ import {
 } from "../../../lib/db";
 import { getSubjectTheme } from "../../../lib/subjectTheme";
 import { srsStepLabel, srsStepHint } from "../../../lib/srs";
+import { uploadImageToCloudinary, compressImageFile } from "../../../lib/image-host";
 
 const WENKAI_CONTENT_FONT = '"LXGW WenKai Screen", "LXGW WenKai", "Kaiti SC", "STKaiti", "Noto Serif SC", serif';
 
@@ -96,13 +98,19 @@ function splitCalloutSegments(text: string): CalloutSegment[] {
   return result;
 }
 
-function renderSegmentsWithCallout(text: string, keyPrefix: string, className?: string): ReactNode {
+function renderSegmentsWithCallout(text: string, keyPrefix: string, className?: string, renderMarkdown = false): ReactNode {
   const segments = splitCalloutSegments(text);
   const baseTextClass = className
     ? `whitespace-pre-wrap text-[0.97rem] leading-7 text-slate-700 ${className}`
     : "whitespace-pre-wrap text-[0.97rem] leading-7 text-slate-700";
+  const markdownTextClass = className
+    ? `text-[0.97rem] leading-7 text-slate-700 ${className}`
+    : "text-[0.97rem] leading-7 text-slate-700";
 
   if (segments.length === 0) {
+    if (renderMarkdown) {
+      return <MarkdownMathContent content={text} className={markdownTextClass} />;
+    }
     return (
       <div className={baseTextClass}>
         <FormulaText text={text} />
@@ -118,11 +126,19 @@ function renderSegmentsWithCallout(text: string, keyPrefix: string, className?: 
           className="my-4 border-l-4 border-red-400/80 bg-red-50/50 px-4 py-3 text-[0.95rem] leading-7 text-red-950/75"
         >
           <p className="text-xs font-semibold tracking-[0.14em] uppercase text-red-900/70">易错点</p>
-          <div className="mt-1 whitespace-pre-wrap">
-            <FormulaText text={segment.content} />
-          </div>
+          {renderMarkdown ? (
+            <MarkdownMathContent content={segment.content} className="mt-1" />
+          ) : (
+            <div className="mt-1 whitespace-pre-wrap">
+              <FormulaText text={segment.content} />
+            </div>
+          )}
         </aside>
       );
+    }
+
+    if (renderMarkdown) {
+      return <MarkdownMathContent key={`${keyPrefix}-text-${idx}`} content={segment.content} className={markdownTextClass} />;
     }
 
     return (
@@ -176,6 +192,9 @@ function SummaryPageContent() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [keywordsByNoteId, setKeywordsByNoteId] = useState<Record<number, string[]>>({});
   const [keywordDraft, setKeywordDraft] = useState("");
+  const [imageBubbleDraft, setImageBubbleDraft] = useState("");
+  const [showImageBubbleInput, setShowImageBubbleInput] = useState(false);
+  const [imageBubbleUploading, setImageBubbleUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState({
     coreAnswer: "",
@@ -361,7 +380,8 @@ function SummaryPageContent() {
       (note.keyPoints && note.keyPoints.length > 0) ||
       note.commonMistakes ||
       note.examples ||
-      (note.images && note.images.length > 0)
+      (note.images && note.images.length > 0) ||
+      (note.memoryBubbleImages && note.memoryBubbleImages.length > 0)
     );
   };
 
@@ -394,11 +414,15 @@ function SummaryPageContent() {
   useEffect(() => {
     if (!recallLog) {
       setKeywordDraft("");
+      setImageBubbleDraft("");
+      setShowImageBubbleInput(false);
       setIsEditing(false);
       return;
     }
 
     setKeywordDraft("");
+    setImageBubbleDraft("");
+    setShowImageBubbleInput(false);
     setIsEditing(false);
     setEditDraft({
       coreAnswer: recallLog.note.coreAnswer ?? "",
@@ -469,6 +493,90 @@ function SummaryPageContent() {
     setKeywordsByNoteId((prev) => ({ ...prev, [updated.id]: updated.keywords ?? [] }));
   };
 
+  const handleImageFilePaste = async (file: File) => {
+    if (!recallLog) return;
+    setImageBubbleUploading(true);
+    try {
+      const cloudUrl = await uploadImageToCloudinary(file);
+      if (cloudUrl) { addImageBubble(cloudUrl); return; }
+      const blob = await compressImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => { const url = ev.target?.result as string; if (url) addImageBubble(url); };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.error("[summary] image paste failed", err);
+    } finally {
+      setImageBubbleUploading(false);
+    }
+  };
+
+  const addImageBubble = (src: string) => {
+    if (!recallLog) return;
+    const value = src.trim();
+    if (!value) return;
+    const currentBubbleImages = recallLog.note.memoryBubbleImages ?? [];
+    if (currentBubbleImages.includes(value)) return;
+    const nextBubbleImages = [...currentBubbleImages, value];
+    const currentImages = recallLog.note.images ?? [];
+    const nextImages = currentImages.includes(value) ? currentImages : [...currentImages, value];
+    let updated: ReturnType<typeof updateNote> = null;
+    try {
+      updated = updateNote(recallLog.note.id, {
+        front: recallLog.note.front,
+        question: recallLog.note.question,
+        subject: recallLog.note.subject,
+        difficulty: recallLog.note.difficulty,
+        content: recallLog.note.coreAnswer ?? recallLog.note.content,
+        coreAnswer: recallLog.note.coreAnswer ?? recallLog.note.content,
+        keyPoints: recallLog.note.keyPoints ?? [],
+        keywords: keywordsByNoteId[recallLog.note.id] ?? recallLog.note.keywords ?? [],
+        examples: recallLog.note.examples,
+        commonMistakes: recallLog.note.commonMistakes,
+        images: nextImages,
+        memoryBubbleImages: nextBubbleImages,
+      });
+    } catch (error) {
+      console.error("[summary] addImageBubble failed", error);
+      setToast("保存图片失败：本地存储空间不足，请删减图片后重试");
+      return;
+    }
+    if (!updated) return;
+    setRecallLog((prev) => (prev ? { ...prev, note: updated } : prev));
+    setLogs((prev) => prev.map((log) => (log.note_id === updated.id ? { ...log, note: updated } : log)));
+    setImageBubbleDraft("");
+    setShowImageBubbleInput(false);
+  };
+
+  const removeImageBubble = (src: string) => {
+    if (!recallLog) return;
+    const currentBubbleImages = recallLog.note.memoryBubbleImages ?? [];
+    const nextBubbleImages = currentBubbleImages.filter((img) => img !== src);
+    let updated: ReturnType<typeof updateNote> = null;
+    try {
+      updated = updateNote(recallLog.note.id, {
+        front: recallLog.note.front,
+        question: recallLog.note.question,
+        subject: recallLog.note.subject,
+        difficulty: recallLog.note.difficulty,
+        content: recallLog.note.coreAnswer ?? recallLog.note.content,
+        coreAnswer: recallLog.note.coreAnswer ?? recallLog.note.content,
+        keyPoints: recallLog.note.keyPoints ?? [],
+        keywords: keywordsByNoteId[recallLog.note.id] ?? recallLog.note.keywords ?? [],
+        examples: recallLog.note.examples,
+        commonMistakes: recallLog.note.commonMistakes,
+        images: recallLog.note.images,
+        memoryBubbleImages: nextBubbleImages,
+      });
+    } catch (error) {
+      console.error("[summary] removeImageBubble failed", error);
+      setToast("删除图片失败：请稍后重试");
+      return;
+    }
+    if (!updated) return;
+    setRecallLog((prev) => (prev ? { ...prev, note: updated } : prev));
+    setLogs((prev) => prev.map((log) => (log.note_id === updated.id ? { ...log, note: updated } : log)));
+  };
+
   const saveInlineEdit = () => {
     if (!recallLog) return;
     const keyPoints = editDraft.keyPointsText
@@ -476,19 +584,26 @@ function SummaryPageContent() {
       .map((line) => line.trim())
       .filter(Boolean);
 
-    const updated = updateNote(recallLog.note.id, {
-      front: recallLog.note.front,
-      question: recallLog.note.question,
-      subject: recallLog.note.subject,
-      difficulty: recallLog.note.difficulty,
-      content: editDraft.coreAnswer,
-      coreAnswer: editDraft.coreAnswer,
-      keyPoints,
-      keywords: keywordsByNoteId[recallLog.note.id] ?? recallLog.note.keywords ?? [],
-      examples: editDraft.examples,
-      commonMistakes: editDraft.commonMistakes,
-      images: recallLog.note.images,
-    });
+    let updated: ReturnType<typeof updateNote> = null;
+    try {
+      updated = updateNote(recallLog.note.id, {
+        front: recallLog.note.front,
+        question: recallLog.note.question,
+        subject: recallLog.note.subject,
+        difficulty: recallLog.note.difficulty,
+        content: editDraft.coreAnswer,
+        coreAnswer: editDraft.coreAnswer,
+        keyPoints,
+        keywords: keywordsByNoteId[recallLog.note.id] ?? recallLog.note.keywords ?? [],
+        examples: editDraft.examples,
+        commonMistakes: editDraft.commonMistakes,
+        images: recallLog.note.images,
+      });
+    } catch (error) {
+      console.error("[summary] save inline edit failed", error);
+      setToast("保存失败：本地存储空间不足，请删减图片/旧数据后重试");
+      return;
+    }
 
     if (!updated) {
       setToast("保存失败，请重试");
@@ -863,7 +978,7 @@ function SummaryPageContent() {
                   <section className="grid grid-cols-[minmax(130px,34%)_1fr] items-start gap-4 md:gap-6">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold tracking-widest text-[#7A8B7C] uppercase mb-2">记忆泡泡</p>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 overflow-y-auto max-h-80 pr-1">
                         {recallAnswerLayout.hasFocus && (
                           <span className="inline-flex items-center gap-2 self-start rounded-full border border-[#9BAA95]/55 bg-[#E7ECDF]/85 px-3 py-1.5 text-sm font-semibold font-serif leading-relaxed tracking-wide text-slate-700 shadow-[0_8px_24px_rgb(0,0,0,0.06)] backdrop-blur-sm" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                             <span aria-hidden>🔖</span>
@@ -880,6 +995,85 @@ function SummaryPageContent() {
                           placeholder="+ 提取关键词..."
                           fontFamily={WENKAI_CONTENT_FONT}
                         />
+                        {/* Image bubbles */}
+                        {(recallLog.note.memoryBubbleImages ?? []).filter(Boolean).length > 0 && (
+                          <div className="flex flex-col gap-2.5">
+                            {(recallLog.note.memoryBubbleImages ?? []).filter(Boolean).map((src, idx) => (
+                              <div key={`${idx}-${src}`} className="relative group">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewImage(src)}
+                                  className="block w-full max-w-[220px] h-32 overflow-hidden rounded-xl border border-[#9BAA95]/55 bg-[#E7ECDF]/85 hover:brightness-95 transition-all"
+                                  title="点击放大"
+                                >
+                                  <img
+                                    src={src}
+                                    alt={`记忆图片 ${idx + 1}`}
+                                    className="h-full w-full object-contain p-1.5"
+                                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeImageBubble(src)}
+                                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] leading-none shadow"
+                                  aria-label="删除图片"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {showImageBubbleInput ? (
+                          <div className="flex gap-1 mt-0.5">
+                            <input
+                              type="text"
+                              value={imageBubbleUploading ? "" : imageBubbleDraft}
+                              onChange={(e) => setImageBubbleDraft(e.target.value)}
+                              onPaste={(e) => {
+                                const items = Array.from(e.clipboardData.items || []);
+                                const imgItem = items.find((it) => it.type.startsWith("image/"));
+                                if (imgItem) {
+                                  e.preventDefault();
+                                  const file = imgItem.getAsFile();
+                                  if (file) void handleImageFilePaste(file);
+                                }
+                                // text URL paste falls through to onChange
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); addImageBubble(imageBubbleDraft); }
+                                if (e.key === "Escape") { setShowImageBubbleInput(false); setImageBubbleDraft(""); }
+                              }}
+                              placeholder={imageBubbleUploading ? "上传中..." : "粘贴截图或 URL"}
+                              disabled={imageBubbleUploading}
+                              ref={(el) => { if (el) setTimeout(() => el.focus(), 0); }}
+                              className="flex-1 min-w-0 rounded-md border border-[#9BAA95]/55 bg-[#F3F4EB] px-2 py-1 text-xs text-slate-700 outline-none focus:border-[#8EA078] disabled:opacity-60"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addImageBubble(imageBubbleDraft)}
+                              className="shrink-0 px-2 py-1 text-xs rounded-md border border-[#9BAA95]/55 bg-[#E7ECDF]/85 text-[#5F7865] hover:bg-[#dde4d3]"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowImageBubbleInput(false); setImageBubbleDraft(""); }}
+                              className="shrink-0 px-2 py-1 text-xs rounded-md border border-[#DADCCF] text-slate-500 hover:bg-[#F1F1E8]"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowImageBubbleInput(true)}
+                            className="self-start px-2 py-1 text-xs rounded-full border border-dashed border-[#9BAA95]/60 text-[#7A8B7C] hover:bg-[#E7ECDF]/60 transition-colors"
+                          >
+                            + 添加图片
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -896,9 +1090,9 @@ function SummaryPageContent() {
                         <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
                           {recallAnswerLayout.hasFocus
                             ? (recallAnswerLayout.rest
-                                ? renderSegmentsWithCallout(recallAnswerLayout.rest, "summary-recall-answer")
+                                ? renderSegmentsWithCallout(recallAnswerLayout.rest, "summary-recall-answer", undefined, true)
                                 : <p className="text-slate-500">已提取核心锚点，无额外推演内容。</p>)
-                            : renderSegmentsWithCallout(recallLog.note.coreAnswer ?? "", "summary-recall-answer")}
+                            : renderSegmentsWithCallout(recallLog.note.coreAnswer ?? "", "summary-recall-answer", undefined, true)}
                         </div>
                       )}
                     </div>
@@ -935,7 +1129,7 @@ function SummaryPageContent() {
                           style={{ fontFamily: WENKAI_CONTENT_FONT }}
                         />
                       ) : (
-                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide whitespace-pre-wrap text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}><FormulaText text={recallLog.note.examples ?? ""} /></div>
+                        <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}><MarkdownMathContent content={recallLog.note.examples ?? ""} /></div>
                       )}
                     </section>
                   )}
@@ -952,7 +1146,7 @@ function SummaryPageContent() {
                         />
                       ) : (
                         <div className="mt-1 text-[0.97rem] font-serif leading-relaxed tracking-wide text-slate-700" style={{ fontFamily: WENKAI_CONTENT_FONT }}>
-                          {renderSegmentsWithCallout(recallLog.note.commonMistakes ?? "", "summary-recall-mistakes")}
+                          {renderSegmentsWithCallout(recallLog.note.commonMistakes ?? "", "summary-recall-mistakes", undefined, true)}
                         </div>
                       )}
                     </section>

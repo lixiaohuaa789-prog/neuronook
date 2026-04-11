@@ -6,7 +6,6 @@ import {
   Cosmograph,
   CosmographConfig,
   CosmographInputData,
-  prepareCosmographData,
   type CosmographRef,
 } from "@cosmograph/react";
 import { useRouter } from "next/navigation";
@@ -365,130 +364,39 @@ export default function GalaxyPage() {
   }, [basePreparedPoints, data.edges]);
 
   useEffect(() => {
-    let cancelled = false;
+    setIsPreparingGraph(true);
+    setPreparedPoints(basePreparedPoints);
+    setPreparedLinks(basePreparedLinks);
 
-    async function prepareData() {
-      setIsPreparingGraph(true);
-      setPreparedPoints(basePreparedPoints);
-      setPreparedLinks(basePreparedLinks);
-      setGraphRuntimeDebug((current) => ({
-        ...current,
-        rawPointsCount: basePreparedPoints.length,
-        rawLinksCount: basePreparedLinks.length,
-        prepareMode: "idle",
-        prepareError: null,
-      }));
+    setPreparedDataset({
+      points: basePreparedPoints,
+      links: basePreparedLinks,
+      cosmographConfig: {
+        pointIdBy: "id",
+        pointIndexBy: "idx",
+        pointLabelBy: "label",
+        pointLabelWeightBy: "labelWeight",
+        pointColorBy: "color",
+        pointSizeBy: "size",
+        linkSourceBy: "source",
+        linkTargetBy: "target",
+        linkSourceIndexBy: "sourceIdx",
+        linkTargetIndexBy: "targetIdx",
+        linkColorBy: "color",
+        linkWidthBy: "width",
+        linkStrengthBy: "strength",
+      },
+    });
 
-      const dataConfig = {
-        points: {
-          pointIdBy: "id",
-          pointLabelBy: "label",
-          pointLabelWeightBy: "labelWeight",
-          pointColorBy: "color",
-          pointSizeBy: "size",
-          pointIncludeColumns: ["*"],
-        },
-        links: {
-          linkSourceBy: "source",
-          linkTargetsBy: ["target"],
-          linkColorBy: "color",
-          linkWidthBy: "width",
-          linkStrengthBy: "strength",
-          linkIncludeColumns: ["*"],
-        },
-      };
+    setGraphRuntimeDebug((current) => ({
+      ...current,
+      rawPointsCount: basePreparedPoints.length,
+      rawLinksCount: basePreparedLinks.length,
+      prepareMode: "fallback",
+      prepareError: null,
+    }));
 
-      try {
-        const result = await prepareCosmographData(dataConfig, basePreparedPoints, basePreparedLinks);
-        if (cancelled) return;
-
-        if (result?.points && result?.links) {
-          setPreparedDataset({
-            points: result.points,
-            links: result.links,
-            cosmographConfig: result.cosmographConfig,
-          });
-          setGraphRuntimeDebug((current) => ({
-            ...current,
-            rawPointsCount: basePreparedPoints.length,
-            rawLinksCount: basePreparedLinks.length,
-            prepareMode: "prepared",
-            prepareError: null,
-          }));
-        } else {
-          setPreparedDataset({
-            points: basePreparedPoints,
-            links: basePreparedLinks,
-            cosmographConfig: {
-              pointIdBy: "id",
-              pointIndexBy: "idx",
-              pointLabelBy: "label",
-              pointLabelWeightBy: "labelWeight",
-              pointColorBy: "color",
-              pointSizeBy: "size",
-              pointIncludeColumns: ["*"],
-              linkSourceBy: "source",
-              linkTargetBy: "target",
-              linkSourceIndexBy: "sourceIdx",
-              linkTargetIndexBy: "targetIdx",
-              linkColorBy: "color",
-              linkWidthBy: "width",
-              linkStrengthBy: "strength",
-              linkIncludeColumns: ["*"],
-            },
-          });
-          setGraphRuntimeDebug((current) => ({
-            ...current,
-            rawPointsCount: basePreparedPoints.length,
-            rawLinksCount: basePreparedLinks.length,
-            prepareMode: "fallback",
-            prepareError: "prepareCosmographData 返回空结果，已切换为直接数组输入",
-          }));
-        }
-      } catch (error) {
-        if (cancelled) return;
-
-        const message = error instanceof Error ? error.message : "未知错误";
-        setPreparedDataset({
-          points: basePreparedPoints,
-          links: basePreparedLinks,
-          cosmographConfig: {
-            pointIdBy: "id",
-            pointIndexBy: "idx",
-            pointLabelBy: "label",
-            pointLabelWeightBy: "labelWeight",
-            pointColorBy: "color",
-            pointSizeBy: "size",
-            pointIncludeColumns: ["*"],
-            linkSourceBy: "source",
-            linkTargetBy: "target",
-            linkSourceIndexBy: "sourceIdx",
-            linkTargetIndexBy: "targetIdx",
-            linkColorBy: "color",
-            linkWidthBy: "width",
-            linkStrengthBy: "strength",
-            linkIncludeColumns: ["*"],
-          },
-        });
-        setGraphRuntimeDebug((current) => ({
-          ...current,
-          rawPointsCount: basePreparedPoints.length,
-          rawLinksCount: basePreparedLinks.length,
-          prepareMode: "failed",
-          prepareError: message,
-        }));
-      } finally {
-        if (!cancelled) {
-          setIsPreparingGraph(false);
-        }
-      }
-    }
-
-    prepareData();
-
-    return () => {
-      cancelled = true;
-    };
+    setIsPreparingGraph(false);
   }, [basePreparedLinks, basePreparedPoints]);
 
   const graphConfig = useMemo<Partial<CosmographConfig>>(() => {

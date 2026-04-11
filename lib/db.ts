@@ -9,8 +9,10 @@ import {
   type ReviewFeedback,
   type SrsStep,
 } from "./srs";
+import { compressToUTF16, decompressFromUTF16 } from "lz-string";
 
 const KEY = "study_app_data";
+const KEY_COMPRESSED = "study_app_data_lz";
 
 function emptyDB(): StudyDB {
   return { notes: [], reviews: [], pomodoros: [], checkins: [], reviewLogs: [], folders: [], tombstones: [] };
@@ -35,6 +37,7 @@ export type Note = {
   commonMistakes?: string; // 易错点 / 常见误区
   examples?: string; // 示例/应用场景
   images?: string[]; // 图片URLs
+  memoryBubbleImages?: string[]; // 记忆泡泡专用图片（与 images 解耦）
   updatedAt?: number;
 };
 
@@ -167,6 +170,7 @@ function migrateParsed(raw: unknown): StudyDB {
     if (n.content == null) n.content = "";
     if (n.updatedAt == null) n.updatedAt = new Date(n.created_at as string).getTime() || Date.now();
     if (!Array.isArray(n.keywords)) n.keywords = [];
+    if (n.memoryBubbleImages != null && !Array.isArray(n.memoryBubbleImages)) n.memoryBubbleImages = [];
 
     // 双引擎状态字段兜底
     n.status = normalizeStatus(n.status);
@@ -242,22 +246,75 @@ function migrateParsed(raw: unknown): StudyDB {
 
 export function getDB(): StudyDB | null {
   if (typeof window === "undefined") return null;
-  const data = localStorage.getItem(KEY);
-  const parsed = data
-    ? JSON.parse(data)
-    : emptyDB();
-  return migrateParsed(parsed);
+  const compressed = localStorage.getItem(KEY_COMPRESSED);
+  const legacy = localStorage.getItem(KEY);
+  const decompressed = compressed ? decompressFromUTF16(compressed) : null;
+  const raw = decompressed && decompressed.trim().length > 0
+    ? decompressed
+    : legacy;
+
+  let parsed: unknown = emptyDB();
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // corrupted payload fallback
+      parsed = emptyDB();
+    }
+  }
+
+  const migrated = migrateParsed(parsed);
+
+  // Self-heal corrupted/empty compressed payload by re-writing a valid compressed snapshot.
+  if (compressed && (!decompressed || decompressed.trim().length === 0) && typeof window !== "undefined") {
+    try {
+      const healed = JSON.stringify(migrated);
+      localStorage.setItem(KEY_COMPRESSED, compressToUTF16(healed));
+      localStorage.removeItem(KEY);
+    } catch {
+      // ignore repair failure; callers still receive migrated data
+    }
+  }
+
+  return migrated;
 }
 
 export function saveDB(db: StudyDB) {
+  const compactNotes = () => {
+    for (const note of db.notes) {
+      if ((note.question ?? "") === (note.front ?? "")) note.question = undefined;
+      if ((note.coreAnswer ?? "") === (note.content ?? "")) note.coreAnswer = undefined;
+      if (Array.isArray(note.keyPoints) && note.keyPoints.length === 0) note.keyPoints = undefined;
+      if (Array.isArray(note.keywords) && note.keywords.length === 0) note.keywords = undefined;
+      if (Array.isArray(note.images) && note.images.length === 0) note.images = undefined;
+      if (Array.isArray(note.memoryBubbleImages) && note.memoryBubbleImages.length === 0) note.memoryBubbleImages = undefined;
+      if ((note.examples ?? "").trim() === "") note.examples = undefined;
+      if ((note.commonMistakes ?? "").trim() === "") note.commonMistakes = undefined;
+    }
+  };
+
   try {
-    localStorage.setItem(KEY, JSON.stringify(db));
+    const json = JSON.stringify(db);
+    localStorage.setItem(KEY_COMPRESSED, compressToUTF16(json));
+    localStorage.removeItem(KEY);
   } catch (e) {
     const isQuota =
       e instanceof DOMException &&
       (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED");
     if (isQuota) {
-      throw new Error("本地存储空间已满，图片太大或数据过多。请尝试使用图片 URL 替代直接上传，或删除部分旧数据。");
+      // One retry after compacting duplicated/empty fields to reclaim space.
+      try {
+        compactNotes();
+        const compactJson = JSON.stringify(db);
+        localStorage.setItem(KEY_COMPRESSED, compressToUTF16(compactJson));
+        localStorage.removeItem(KEY);
+      } catch {
+        throw new Error("本地存储空间已满，图片太大或数据过多。请尝试使用图片 URL 替代直接上传，或删除部分旧数据。");
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("study-app-changed"));
+      }
+      return;
     }
     throw e;
   }
@@ -709,6 +766,11 @@ export function updateNote(noteId: number, data: NewNoteInput): Note | null {
   note.commonMistakes = data.commonMistakes?.trim() || undefined;
   note.examples = data.examples?.trim() || undefined;
   note.images = data.images && data.images.length > 0 ? data.images : undefined;
+  if (Object.prototype.hasOwnProperty.call(data, "memoryBubbleImages")) {
+    note.memoryBubbleImages = data.memoryBubbleImages && data.memoryBubbleImages.length > 0
+      ? data.memoryBubbleImages
+      : undefined;
+  }
   note.updatedAt = Date.now();
 
   saveDB(db);
