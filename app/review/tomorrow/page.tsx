@@ -187,7 +187,7 @@ export default function TomorrowPage() {
                   flipped.has(item.note_id) ? "note-body" : "note-body note-body-front"
                 }
               >
-                <FormulaText text={flipped.has(item.note_id) ? item.note.content : item.note.front} inline />
+                <FormulaText text={flipped.has(item.note_id) ? (item.note.coreAnswer || item.note.content || "") : item.note.front} inline />
               </div>
             </article>
               );

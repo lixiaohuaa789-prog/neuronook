@@ -1,3 +1,8 @@
+# v1.0.7 (2026-04-11)
+
+- 核心答案显示修复：兼容历史/导入数据中 `coreAnswer` 有值但 `content` 为空的情况，迁移阶段自动回填 `content`。
+- 复习页翻面显示修复：`mastered/progress/tomorrow/summary` 统一使用 `coreAnswer || content`，避免核心答案空白。
+
 # v1.0.6 (2026-04-11)
 
 - 云同步面板新增当前存储引擎显示：可直接看到当前使用 `localStorage` 还是 `IndexedDB`。

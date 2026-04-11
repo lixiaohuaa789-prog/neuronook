@@ -395,6 +395,10 @@ function migrateParsed(raw: unknown): StudyDB {
     if (n.coreAnswer == null && n.content) {
       n.coreAnswer = n.content; // 从content字段推导
     }
+    // 兼容旧/导入数据：若仅存在 coreAnswer，回填到 content，避免旧页面翻面为空。
+    if ((!n.content || String(n.content).trim() === "") && typeof n.coreAnswer === "string" && n.coreAnswer.trim()) {
+      n.content = n.coreAnswer;
+    }
     // 其他新字段保持undefined，符合可选字段的设计
   }
 
