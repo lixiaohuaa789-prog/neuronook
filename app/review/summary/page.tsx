@@ -394,7 +394,7 @@ function SummaryPageContent() {
         focusIsMath: false,
       };
     }
-    const answer = recallLog.note.coreAnswer ?? "";
+    const answer = recallLog.note.coreAnswer ?? recallLog.note.content ?? "";
     const content = recallLog.note.content ?? "";
     const parsedFromAnswer = extractFocusBlock(answer);
     const parsedFromContent = extractFocusBlock(content);
@@ -425,7 +425,7 @@ function SummaryPageContent() {
     setShowImageBubbleInput(false);
     setIsEditing(false);
     setEditDraft({
-      coreAnswer: recallLog.note.coreAnswer ?? "",
+      coreAnswer: recallLog.note.coreAnswer ?? recallLog.note.content ?? "",
       keyPointsText: (recallLog.note.keyPoints ?? []).join("\n"),
       examples: recallLog.note.examples ?? "",
       commonMistakes: recallLog.note.commonMistakes ?? "",
@@ -849,7 +849,7 @@ function SummaryPageContent() {
 
                                     <div className="h-[calc(100%-4.9rem)] overflow-y-auto rounded-xl border px-3 py-3 pr-2 mb-3" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
                                       <div className="text-sm whitespace-pre-wrap leading-relaxed text-center" style={{ color: "var(--text)" }}>
-                                        <FormulaText text={log.note.content} className="review-summary-back-formula" />
+                                        <FormulaText text={log.note.coreAnswer || log.note.content || ""} className="review-summary-back-formula" />
                                       </div>
                                     </div>
 
@@ -1092,7 +1092,7 @@ function SummaryPageContent() {
                             ? (recallAnswerLayout.rest
                                 ? renderSegmentsWithCallout(recallAnswerLayout.rest, "summary-recall-answer", undefined, true)
                                 : <p className="text-slate-500">已提取核心锚点，无额外推演内容。</p>)
-                            : renderSegmentsWithCallout(recallLog.note.coreAnswer ?? "", "summary-recall-answer", undefined, true)}
+                            : renderSegmentsWithCallout(recallLog.note.coreAnswer ?? recallLog.note.content ?? "", "summary-recall-answer", undefined, true)}
                         </div>
                       )}
                     </div>

@@ -1868,7 +1868,7 @@ function ReviewPageContent() {
                           ? (recallAnswerLayout.rest
                               ? renderSegmentsWithCallout(recallAnswerLayout.rest, "recall-answer", undefined, true)
                               : <p className="text-[var(--muted)]">已提取核心锚点，无额外推演内容。</p>)
-                          : renderSegmentsWithCallout(recallItem.note.coreAnswer ?? "", "recall-answer", undefined, true)}
+                          : renderSegmentsWithCallout(recallItem.note.coreAnswer ?? recallItem.note.content ?? "", "recall-answer", undefined, true)}
                       </div>
                     </div>
                   </section>
